@@ -1,10 +1,19 @@
 "use client";
 
-import { Rocket, Eye, MessageSquare, Coins, Home, GitBranch } from "lucide-react";
+import {
+  Rocket,
+  Eye,
+  MessageSquare,
+  Coins,
+  Home,
+  GitBranch,
+} from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
 import { cn } from "@/lib/utils";
+import { NotificationsBell } from "@/components/notifications/NotificationsBell";
 
 type StudioNavbarProps = {
+  userId: string;
   projectName: string;
   credits: number;
   statusText?: string;
@@ -19,6 +28,7 @@ type StudioNavbarProps = {
 };
 
 export function StudioNavbar({
+  userId,
   projectName,
   credits,
   statusText = "Ready to build",
@@ -51,6 +61,7 @@ export function StudioNavbar({
       </span>
       <div className="mx-auto text-xs text-brand-sub">{statusText}</div>
       <div className="flex items-center gap-2">
+        <NotificationsBell userId={userId} compact />
         <span className="inline-flex items-center gap-1 rounded-md border border-brand-border bg-brand-card px-2 py-1 text-xs text-brand-text">
           <Coins className="h-3.5 w-3.5 text-brand-or" />
           {credits}

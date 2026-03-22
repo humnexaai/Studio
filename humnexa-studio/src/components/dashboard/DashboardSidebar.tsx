@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { CreditBar } from "@/components/ui/CreditBar";
 import { Logo } from "@/components/ui/Logo";
+import { NotificationsBell } from "@/components/notifications/NotificationsBell";
 
 const navItems = [
   { href: "/dashboard", label: "Projects" },
@@ -25,7 +26,10 @@ export function DashboardSidebar({
 }: DashboardSidebarProps): React.ReactElement {
   return (
     <aside className="flex h-screen w-[220px] flex-col border-r border-brand-border bg-brand-surf p-4">
-      <Logo />
+      <div className="flex items-center justify-between">
+        <Logo />
+        <NotificationsBell userId={userId} compact />
+      </div>
       <nav className="mt-6 space-y-2">
         {navItems.map((item) => (
           <Link

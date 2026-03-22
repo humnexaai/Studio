@@ -40,4 +40,13 @@ export async function deductCreditsOnSuccess(
   if (txnError) {
     throw new Error("CREDIT_DEDUCTION_TXN_LOG_FAILED");
   }
+
+  if (newBalance === 0) {
+    await supabase.from("notifications").insert({
+      user_id: userId,
+      title: "Credits exhausted",
+      body: "Your credits are now 0. Upgrade to continue using AI build mode.",
+      type: "credits_zero",
+    });
+  }
 }

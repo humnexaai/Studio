@@ -57,6 +57,15 @@ type DiffPatch = {
   content: string;
 };
 
+type NotificationEventRow = {
+  id: string;
+  user_id: string;
+  title: string;
+  body: string;
+  type: string;
+  created_at: string;
+};
+
 type StudioLayoutProps = {
   projectId: string;
   initialProjectName: string;
@@ -107,6 +116,9 @@ export function StudioLayout({
   const [pushLoading, setPushLoading] = useState(false);
   const [pushedRepoUrl, setPushedRepoUrl] = useState<string | null>(null);
   const [pushToast, setPushToast] = useState<string | null>(null);
+  const [toastTone, setToastTone] = useState<"default" | "success" | "error">(
+    "default",
+  );
   const [deployOpen, setDeployOpen] = useState(false);
   const [deployLoading, setDeployLoading] = useState(false);
   const [deployLogs, setDeployLogs] = useState<string[]>([]);
@@ -122,9 +134,10 @@ export function StudioLayout({
     medium: Array<{ file: string; issue: string }>;
     blockDeploy: boolean;
   } | null>(null);
+  const desktopNotifiedRef = useRef<string[]>([]);
   const pushTimeoutRef = useRef<number | null>(null);
   const saveTimeoutRef = useRef<Record<string, number>>({});
-    const {
+  const {
     chatWidth,
     previewWidth,
     chatCollapsed,
@@ -136,8 +149,8 @@ export function StudioLayout({
     enqueuePrompt,
     setPlanMode,
     autoApply,
-      setAutoApply,
-    } = useStudioStore();
+    setAutoApply,
+  } = useStudioStore();
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -152,6 +165,55 @@ export function StudioLayout({
     window.localStorage.setItem("humnexa-auto-apply", autoApply ? "true" : "false");
   }, [autoApply]);
   const credits = useUserStore((state) => state.credits);
+  const userId = useUserStore((state) => state.userId);
+
+  useEffect(() => {
+    if (userId) return;
+    void supabase.auth.getUser().then(({ data }) => {
+      const id = data.user?.id;
+      if (id) {
+        useUserStore.getState().setUser({
+          userId: id,
+          name: data.user?.user_metadata?.full_name ?? "Builder",
+        });
+      }
+    });
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId || typeof window === "undefined" || !("Notification" in window)) return;
+    const channel = supabase
+      .channel(`studio-desktop-${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          const event = payload.new as NotificationEventRow;
+          if (
+            !["deploy_success", "deploy_failed", "credits_zero"].includes(event.type)
+          ) {
+            return;
+          }
+          if (Notification.permission !== "granted") return;
+          if (desktopNotifiedRef.current.includes(event.id)) return;
+          desktopNotifiedRef.current = [
+            ...desktopNotifiedRef.current.slice(-20),
+            event.id,
+          ];
+          new Notification(event.title, { body: event.body });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [userId]);
 
   const activeFile = useMemo(
     () => files.find((file) => file.path === activeFilePath) ?? null,
@@ -360,8 +422,10 @@ export function StudioLayout({
         throw new Error(payload.error ?? "Push failed");
       }
       setPushedRepoUrl(payload.repoUrl ?? null);
+      setToastTone("success");
       setPushToast("✅ Pushed successfully");
     } catch (error) {
+      setToastTone("error");
       setPushToast(
         `❌ ${
           error instanceof Error
@@ -409,6 +473,7 @@ export function StudioLayout({
     });
     setPlanMode(false);
     setDeployOpen(false);
+    setToastTone("default");
     setPushToast("Queued deploy fix prompt for AI");
     if (pushTimeoutRef.current) {
       window.clearTimeout(pushTimeoutRef.current);
@@ -418,6 +483,13 @@ export function StudioLayout({
 
   const startDeploy = async (): Promise<void> => {
     try {
+      if (
+        typeof window !== "undefined" &&
+        "Notification" in window &&
+        Notification.permission === "default"
+      ) {
+        await Notification.requestPermission();
+      }
       setDeployOpen(true);
       setDeployLoading(true);
       setDeployStep("security");
@@ -538,6 +610,7 @@ export function StudioLayout({
   return (
     <div className="flex min-h-screen flex-col bg-brand-bg">
       <StudioNavbar
+        userId={userId ?? ""}
         projectName={projectName}
         credits={credits}
         onDeploy={() => setDeployOpen(true)}
@@ -666,7 +739,15 @@ export function StudioLayout({
         : null}
       {pushToast && typeof document !== "undefined"
         ? createPortal(
-            <div className="fixed bottom-16 right-3 z-50 rounded-md border border-brand-border bg-brand-card px-3 py-2 text-xs text-brand-text">
+            <div
+              className={`fixed bottom-16 right-3 z-50 rounded-md border px-3 py-2 text-xs ${
+                toastTone === "success"
+                  ? "border-brand-gr/40 bg-brand-gr/10 text-brand-gr"
+                  : toastTone === "error"
+                    ? "border-brand-error/40 bg-brand-error/10 text-brand-error"
+                    : "border-brand-border bg-brand-card text-brand-text"
+              }`}
+            >
               {pushToast}
             </div>,
             document.body,

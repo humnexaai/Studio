@@ -348,6 +348,12 @@ export async function POST(
                 status: "success",
                 message: "Deployment is live.",
               });
+              await db.from("notifications").insert({
+                user_id: user.id,
+                title: "Deploy successful",
+                body: `Project ${project.name} is live at ${deployedUrl}`,
+                type: "deploy_success",
+              });
               writeEvent(controller, {
                 type: "success",
                 deploymentId: deployment.id,
@@ -375,6 +381,12 @@ export async function POST(
                   .eq("id", deploymentRowId);
               }
               await db.from("projects").update({ status: "failed" }).eq("id", project.id);
+              await db.from("notifications").insert({
+                user_id: user.id,
+                title: "Deploy failed",
+                body: `Project ${project.name} failed to deploy (${status.readyState}).`,
+                type: "deploy_failed",
+              });
               writeEvent(controller, {
                 type: "step",
                 step: "deploy",
@@ -399,6 +411,12 @@ export async function POST(
               .eq("id", deploymentRowId);
           }
           await db.from("projects").update({ status: "failed" }).eq("id", project.id);
+          await db.from("notifications").insert({
+            user_id: user.id,
+            title: "Deploy timeout",
+            body: `Project ${project.name} deployment timed out after 10 minutes.`,
+            type: "deploy_failed",
+          });
           writeEvent(controller, {
             type: "error",
             code: "DEPLOY_TIMEOUT",
@@ -420,6 +438,15 @@ export async function POST(
               .eq("id", deploymentRowId);
           }
           await db.from("projects").update({ status: "failed" }).eq("id", project.id);
+          await db.from("notifications").insert({
+            user_id: user.id,
+            title: "Deploy error",
+            body:
+              error instanceof Error
+                ? error.message
+                : `Project ${project.name} deploy encountered an unexpected error.`,
+            type: "deploy_failed",
+          });
           writeEvent(controller, {
             type: "error",
             code: "DEPLOY_ERROR",
