@@ -187,6 +187,32 @@ export type Database = {
         };
         Update: Partial<Database["public"]["Tables"]["deployments"]["Row"]>;
       };
+      templates: {
+        Row: {
+          id: string;
+          slug: string;
+          title: string;
+          category: string;
+          description: string;
+          price_inr: number;
+          metadata: Json;
+          is_active?: boolean;
+          downloads?: number;
+          is_india_specific?: boolean;
+          framework?: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<
+          Database["public"]["Tables"]["templates"]["Row"],
+          "id" | "created_at" | "updated_at"
+        > & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["templates"]["Row"]>;
+      };
       payment_orders: {
         Row: {
           id: string;
