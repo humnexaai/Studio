@@ -3,13 +3,28 @@ import * as Sentry from "@sentry/nextjs";
 import { createSupabaseServer } from "@/lib/supabase/server";
 
 const schema = z.object({
-  amount: z.number().int().positive(),
-  currency: z.literal("INR").default("INR"),
-  receipt: z.string().min(3),
+  planId: z.string().uuid(),
+  amount_inr: z.number().positive(),
 });
+
+type RazorpayOrderResponse = {
+  id: string;
+  amount: number;
+  currency: string;
+  status?: string;
+};
 
 export async function POST(request: Request): Promise<Response> {
   try {
+    const keyId = process.env.RAZORPAY_KEY_ID;
+    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+    if (!keyId || !keySecret) {
+      return Response.json(
+        { error: "Razorpay credentials not configured" },
+        { status: 500 },
+      );
+    }
+
     const supabase = createSupabaseServer();
     const {
       data: { user },
@@ -22,17 +37,36 @@ export async function POST(request: Request): Promise<Response> {
 
     const body = await request.json();
     const input = schema.parse(body);
+    const amountPaise = Math.round(input.amount_inr * 100);
+    const receipt = `receipt_${Date.now()}`;
 
-    const razorpayOrderId = `order_${Date.now()}`;
-    const paymentOrder = {
-      user_id: user.id,
-      razorpay_order_id: razorpayOrderId,
-      amount: input.amount,
-      currency: input.currency,
-      status: "created",
-      receipt: input.receipt,
-    };
+    const authHeader = `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString("base64")}`;
+    const razorpayResponse = await fetch("https://api.razorpay.com/v1/orders", {
+      method: "POST",
+      headers: {
+        Authorization: authHeader,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        amount: amountPaise,
+        currency: "INR",
+        receipt,
+        notes: {
+          plan_id: input.planId,
+          user_id: user.id,
+        },
+      }),
+    });
 
+    if (!razorpayResponse.ok) {
+      const bodyText = await razorpayResponse.text();
+      return Response.json(
+        { error: `Razorpay order create failed: ${bodyText}` },
+        { status: 400 },
+      );
+    }
+
+    const order = (await razorpayResponse.json()) as RazorpayOrderResponse;
     const db = supabase as unknown as {
       from: (table: string) => {
         insert: (values: Record<string, unknown>) => Promise<{
@@ -40,15 +74,27 @@ export async function POST(request: Request): Promise<Response> {
         }>;
       };
     };
-    const { error } = await db.from("payment_orders").insert(paymentOrder);
+    const { error } = await db.from("payment_orders").insert({
+      user_id: user.id,
+      razorpay_order_id: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      status: order.status ?? "created",
+      metadata: {
+        plan_id: input.planId,
+        amount_inr: input.amount_inr,
+        receipt,
+      },
+    });
     if (error) throw error;
 
     return Response.json({
       success: true,
       data: {
-        orderId: razorpayOrderId,
-        amount: input.amount,
-        currency: input.currency,
+        orderId: order.id,
+        amount: order.amount,
+        currency: order.currency,
+        keyId,
       },
     });
   } catch (error) {

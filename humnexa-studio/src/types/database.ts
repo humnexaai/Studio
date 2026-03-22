@@ -184,6 +184,45 @@ export type Database = {
         };
         Update: Partial<Database["public"]["Tables"]["deployments"]["Row"]>;
       };
+      payment_orders: {
+        Row: {
+          id: string;
+          user_id: string;
+          razorpay_order_id: string | null;
+          razorpay_payment_id: string | null;
+          amount: number;
+          currency: string;
+          status: string;
+          metadata: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<
+          Database["public"]["Tables"]["payment_orders"]["Row"],
+          "id" | "created_at" | "updated_at"
+        > & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["payment_orders"]["Row"]>;
+      };
+      notifications: {
+        Row: {
+          id: string;
+          user_id: string;
+          title: string;
+          body: string;
+          type: string;
+          read_at: string | null;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["notifications"]["Row"], "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["notifications"]["Row"]>;
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
