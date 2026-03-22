@@ -70,6 +70,7 @@ export type ProjectRecord = {
   name: string;
   framework: string;
   status: "idle" | "building" | "failed" | "ready" | string;
+  branch_name?: string | null;
   github_url?: string | null;
   deployed_url?: string | null;
   created_at?: string;

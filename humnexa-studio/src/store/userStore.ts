@@ -7,6 +7,7 @@ type UserState = {
   name: string;
   credits: number;
   planCode: "free" | "starter" | "pro" | "business";
+  lastModel: string;
   hindiMode: boolean;
   theme: ThemeMode;
   editorFontSize: number;
@@ -15,6 +16,7 @@ type UserState = {
   setUser: (payload: { userId: string; name: string }) => void;
   setCredits: (credits: number) => void;
   setPlanCode: (planCode: UserState["planCode"]) => void;
+  setLastModel: (model: string) => void;
   setHindiMode: (enabled: boolean) => void;
   setTheme: (theme: ThemeMode) => void;
   setEditorFontSize: (value: number) => void;
@@ -27,6 +29,7 @@ export const useUserStore = create<UserState>((set) => ({
   name: "Builder",
   credits: 100,
   planCode: "free",
+  lastModel: "groq",
   hindiMode: false,
   theme: "dark",
   editorFontSize: 14,
@@ -35,6 +38,7 @@ export const useUserStore = create<UserState>((set) => ({
   setUser: ({ userId, name }) => set({ userId, name }),
   setCredits: (credits) => set({ credits }),
   setPlanCode: (planCode) => set({ planCode }),
+  setLastModel: (lastModel) => set({ lastModel }),
   setHindiMode: (enabled) => set({ hindiMode: enabled }),
   setTheme: (theme) => set({ theme }),
   setEditorFontSize: (editorFontSize) => set({ editorFontSize }),

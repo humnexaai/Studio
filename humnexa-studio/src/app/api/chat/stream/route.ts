@@ -233,6 +233,13 @@ export async function POST(req: Request): Promise<Response> {
               ),
             );
           }
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                provider: result.provider,
+              })}\n\n`,
+            ),
+          );
 
           controller.enqueue(
             encoder.encode(

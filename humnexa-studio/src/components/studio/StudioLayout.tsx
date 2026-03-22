@@ -69,6 +69,10 @@ type NotificationEventRow = {
 type StudioLayoutProps = {
   projectId: string;
   initialProjectName: string;
+  initialProjectMeta: {
+    branchName: string | null;
+    deployedUrl: string | null;
+  };
   initialFiles: ProjectFile[];
   initialConversationId: string | null;
   projectFramework: string;
@@ -98,6 +102,7 @@ type StudioLayoutProps = {
 export function StudioLayout({
   projectId,
   initialProjectName,
+  initialProjectMeta,
   initialFiles,
   initialConversationId,
   projectFramework,
@@ -127,6 +132,9 @@ export function StudioLayout({
   );
   const [deployStatusText, setDeployStatusText] = useState("Ready to deploy.");
   const [deployLiveUrl, setDeployLiveUrl] = useState<string | null>(null);
+  const [deployedUrl, setDeployedUrl] = useState<string | null>(
+    initialProjectMeta.deployedUrl ?? null,
+  );
   const [deployError, setDeployError] = useState<string | null>(null);
   const [securityReport, setSecurityReport] = useState<{
     critical: Array<{ file: string; issue: string }>;
@@ -134,6 +142,8 @@ export function StudioLayout({
     medium: Array<{ file: string; issue: string }>;
     blockDeploy: boolean;
   } | null>(null);
+  const [monacoErrorCount, setMonacoErrorCount] = useState(0);
+  const [supabaseConnected, setSupabaseConnected] = useState(true);
   const desktopNotifiedRef = useRef<string[]>([]);
   const pushTimeoutRef = useRef<number | null>(null);
   const saveTimeoutRef = useRef<Record<string, number>>({});
@@ -147,6 +157,7 @@ export function StudioLayout({
     toggleChatCollapsed,
     togglePreviewCollapsed,
     enqueuePrompt,
+    planMode,
     setPlanMode,
     autoApply,
     setAutoApply,
@@ -166,6 +177,7 @@ export function StudioLayout({
   }, [autoApply]);
   const credits = useUserStore((state) => state.credits);
   const userId = useUserStore((state) => state.userId);
+  const lastModel = useUserStore((state) => state.lastModel);
 
   useEffect(() => {
     if (userId) return;
@@ -214,6 +226,24 @@ export function StudioLayout({
       void supabase.removeChannel(channel);
     };
   }, [userId]);
+
+  useEffect(() => {
+    const channel = supabase.channel(`studio-health-${projectId}`);
+    const timeout = window.setTimeout(() => setSupabaseConnected(false), 6000);
+    channel.subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        setSupabaseConnected(true);
+        window.clearTimeout(timeout);
+      }
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        setSupabaseConnected(false);
+      }
+    });
+    return () => {
+      window.clearTimeout(timeout);
+      void supabase.removeChannel(channel);
+    };
+  }, [projectId]);
 
   const activeFile = useMemo(
     () => files.find((file) => file.path === activeFilePath) ?? null,
@@ -407,6 +437,42 @@ export function StudioLayout({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent): void => {
+      const target = event.target as HTMLElement | null;
+      const inTextEntry =
+        !!target &&
+        (target.tagName === "TEXTAREA" ||
+          target.tagName === "INPUT" ||
+          target.isContentEditable);
+
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === "p") {
+        event.preventDefault();
+        setPlanMode(!planMode);
+        return;
+      }
+
+      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+        if (inTextEntry) return;
+        event.preventDefault();
+        window.dispatchEvent(new Event("humnexa-chat-submit"));
+        return;
+      }
+
+      if (event.key === "Escape") {
+        if (deployOpen && !deployLoading) {
+          setDeployOpen(false);
+        }
+        window.dispatchEvent(new Event("humnexa-close-modals"));
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [deployLoading, deployOpen, planMode, setPlanMode]);
+
   const pushToGitHub = async (): Promise<void> => {
     try {
       setPushLoading(true);
@@ -440,6 +506,149 @@ export function StudioLayout({
       }
       pushTimeoutRef.current = window.setTimeout(() => setPushToast(null), 3500);
     }
+  };
+
+  const normalizePath = (value: string): string =>
+    value
+      .trim()
+      .replace(/^\/+/, "")
+      .replace(/\/{2,}/g, "/");
+
+  const createFileAtPath = async (pathInput: string): Promise<void> => {
+    const path = normalizePath(pathInput);
+    if (!path) return;
+    if (files.some((file) => file.path === path)) {
+      setToastTone("error");
+      setPushToast("File already exists.");
+      return;
+    }
+    try {
+      await syncDiffsToDatabase([{ path, content: "" }]);
+      setFiles((prev) => [
+        ...prev,
+        {
+          id: `file-${Date.now()}`,
+          path,
+          content: "",
+          language: detectLanguageFromPath(path),
+          updatedAt: new Date().toISOString(),
+        },
+      ]);
+      setActiveFilePath(path);
+      setToastTone("success");
+      setPushToast(`Created ${path}`);
+    } catch (error) {
+      setToastTone("error");
+      setPushToast(error instanceof Error ? error.message : "Unable to create file");
+    }
+  };
+
+  const createFolderAtPath = (pathInput: string): void => {
+    const folder = normalizePath(pathInput).replace(/\/+$/, "");
+    if (!folder) return;
+    const placeholder = `${folder}/.gitkeep`;
+    void createFileAtPath(placeholder);
+  };
+
+  const renameFilePath = async (oldPath: string, newPathInput: string): Promise<void> => {
+    const newPath = normalizePath(newPathInput);
+    if (!newPath || newPath === oldPath) return;
+    const existing = files.find((file) => file.path === oldPath);
+    if (!existing) return;
+    try {
+      await syncDiffsToDatabase([{ path: newPath, content: existing.content }]);
+      const db = supabase as unknown as {
+        from: (table: string) => {
+          delete: () => {
+            eq: (column: string, value: string) => {
+              eq: (column2: string, value2: string) => Promise<{
+                error: { message?: string } | null;
+              }>;
+            };
+          };
+        };
+      };
+      await db
+        .from("project_files")
+        .delete()
+        .eq("project_id", projectId)
+        .eq("file_path", oldPath);
+
+      setFiles((prev) =>
+        prev.map((file) =>
+          file.path === oldPath
+            ? {
+                ...file,
+                path: newPath,
+                language: detectLanguageFromPath(newPath),
+                updatedAt: new Date().toISOString(),
+              }
+            : file,
+        ),
+      );
+      if (activeFilePath === oldPath) {
+        setActiveFilePath(newPath);
+      }
+      setToastTone("success");
+      setPushToast(`Renamed to ${newPath}`);
+    } catch (error) {
+      setToastTone("error");
+      setPushToast(error instanceof Error ? error.message : "Rename failed");
+    }
+  };
+
+  const deleteFilePath = async (path: string): Promise<void> => {
+    try {
+      const db = supabase as unknown as {
+        from: (table: string) => {
+          delete: () => {
+            eq: (column: string, value: string) => {
+              eq: (column2: string, value2: string) => Promise<{
+                error: { message?: string } | null;
+              }>;
+            };
+          };
+        };
+      };
+      const { error } = await db
+        .from("project_files")
+        .delete()
+        .eq("project_id", projectId)
+        .eq("file_path", path);
+      if (error) {
+        throw new Error(error.message ?? "Delete failed");
+      }
+      setFiles((prev) => prev.filter((file) => file.path !== path));
+      if (activeFilePath === path) {
+        const next = files.find((file) => file.path !== path);
+        setActiveFilePath(next?.path ?? null);
+      }
+      setToastTone("default");
+      setPushToast(`Deleted ${path}`);
+    } catch (error) {
+      setToastTone("error");
+      setPushToast(error instanceof Error ? error.message : "Delete failed");
+    }
+  };
+
+  const duplicateFilePath = async (path: string): Promise<void> => {
+    const source = files.find((file) => file.path === path);
+    if (!source) return;
+    const dotIndex = source.path.lastIndexOf(".");
+    const copiedPath =
+      dotIndex > 0
+        ? `${source.path.slice(0, dotIndex)}_copy${source.path.slice(dotIndex)}`
+        : `${source.path}_copy`;
+    await createFileAtPath(copiedPath);
+    setFiles((prev) =>
+      prev.map((file) =>
+        file.path === copiedPath
+          ? { ...file, content: source.content, updatedAt: new Date().toISOString() }
+          : file,
+      ),
+    );
+    await syncDiffsToDatabase([{ path: copiedPath, content: source.content }]);
+    setActiveFilePath(copiedPath);
   };
 
   const syncDiffsToDatabase = async (changedFiles: DiffPatch[]): Promise<void> => {
@@ -639,6 +848,19 @@ export function StudioLayout({
             files={filePaths}
             activeFile={activeFilePath}
             onSelect={handleSelectFile}
+            onCreateFile={(path) => {
+              void createFileAtPath(path);
+            }}
+            onCreateFolder={createFolderAtPath}
+            onRenameFile={(oldPath, newPath) => {
+              void renameFilePath(oldPath, newPath);
+            }}
+            onDeleteFile={(path) => {
+              void deleteFilePath(path);
+            }}
+            onDuplicateFile={(path) => {
+              void duplicateFilePath(path);
+            }}
           />
         </aside>
 
@@ -700,6 +922,7 @@ export function StudioLayout({
                 content={activeFile.content}
                 language={activeFile.language}
                 onChange={handleCodeChange}
+                onErrorCountChange={setMonacoErrorCount}
               />
             ) : (
               <div className="flex h-full items-center justify-center rounded-2xl border border-brand-border bg-brand-card text-brand-sub">
@@ -728,7 +951,13 @@ export function StudioLayout({
           )}
         </aside>
       </div>
-      <StatusBar />
+      <StatusBar
+        branchName={initialProjectMeta.branchName}
+        errorCount={monacoErrorCount}
+        supabaseConnected={supabaseConnected}
+        lastModel={lastModel}
+        deployedUrl={deployedUrl}
+      />
       {saveError && typeof document !== "undefined"
         ? createPortal(
             <div className="fixed bottom-3 right-3 z-50 rounded-md border border-brand-error bg-brand-card px-3 py-2 text-xs text-brand-error">

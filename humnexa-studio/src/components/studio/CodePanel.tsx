@@ -8,6 +8,7 @@ interface CodePanelProps {
   content: string;
   language: string;
   onChange: (value: string) => void;
+  onErrorCountChange?: (count: number) => void;
 }
 
 export function CodePanel({
@@ -15,6 +16,7 @@ export function CodePanel({
   content,
   language,
   onChange,
+  onErrorCountChange,
 }: CodePanelProps): React.ReactElement {
   const fontFamily = useUserStore((state) => state.editorFontFamily);
   const fontSize = useUserStore((state) => state.editorFontSize);
@@ -37,6 +39,10 @@ export function CodePanel({
         theme="vs-dark"
         value={content}
         onChange={(value) => onChange(value ?? "")}
+        onValidate={(markers) => {
+          const errors = markers.filter((marker) => marker.severity === 8).length;
+          onErrorCountChange?.(errors);
+        }}
         options={{
           fontFamily,
           fontSize,

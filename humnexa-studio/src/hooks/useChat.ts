@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useChatStore } from "@/store/chatStore";
 import type { DiffBlock } from "@/types/studio";
+import { useUserStore } from "@/store/userStore";
+import { useUserStore } from "@/store/userStore";
 
 type StreamChatInput = {
   projectId: string;
@@ -20,6 +22,7 @@ export function useChat() {
   const setPendingDiffs = useChatStore((s) => s.setPendingDiffs);
   const setStreamMeta = useChatStore((s) => s.setStreamMeta);
   const clearPending = useChatStore((s) => s.clearPending);
+  const setLastModel = useUserStore((s) => s.setLastModel);
 
   const streamChat = async (input: StreamChatInput): Promise<void> => {
     setStreaming(true);
@@ -65,6 +68,7 @@ export function useChat() {
                 planMode?: boolean;
                 implementPrompt?: string | null;
               };
+              provider?: string;
               diffs?: DiffBlock[];
             };
             if (parsed.text) {
@@ -76,6 +80,9 @@ export function useChat() {
                 planMode: parsed.meta.planMode ?? false,
                 implementPrompt: parsed.meta.implementPrompt ?? null,
               });
+            }
+            if (parsed.provider) {
+              setLastModel(parsed.provider);
             }
             if (parsed.diffs) {
               setPendingDiffs(parsed.diffs);

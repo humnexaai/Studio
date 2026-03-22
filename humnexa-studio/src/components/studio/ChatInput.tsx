@@ -1,7 +1,7 @@
 "use client";
 
 import { Mic, Send, ShieldAlert } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { PlanModeToggle } from "@/components/studio/PlanModeToggle";
 import { QuickChips } from "@/components/studio/QuickChips";
 import { CostPreview } from "@/components/ui/CostPreview";
@@ -25,6 +25,21 @@ export function ChatInput({
   const keyDetected = keyRegex.test(value);
 
   const estimatedCost = planMode ? 0 : Math.min(10, Math.max(1, Math.ceil(value.length / 90)));
+  const submitCurrent = useCallback(() => {
+    if (!value.trim() || disabled) return;
+    onSubmit(value);
+    setValue("");
+  }, [disabled, onSubmit, value]);
+
+  useEffect(() => {
+    const onShortcutSubmit = (): void => {
+      submitCurrent();
+    };
+    window.addEventListener("humnexa-chat-submit", onShortcutSubmit);
+    return () => {
+      window.removeEventListener("humnexa-chat-submit", onShortcutSubmit);
+    };
+  }, [submitCurrent]);
 
   return (
     <div className="border-t border-brand-border bg-brand-card p-4">
@@ -38,6 +53,12 @@ export function ChatInput({
         <textarea
           value={value}
           onChange={(event) => setValue(event.target.value)}
+          onKeyDown={(event) => {
+            if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+              event.preventDefault();
+              submitCurrent();
+            }
+          }}
           placeholder="Describe what to build or fix..."
           rows={3}
           disabled={disabled}
@@ -51,11 +72,7 @@ export function ChatInput({
           <CostPreview estimatedCredits={estimatedCost} />
           <button
             type="button"
-            onClick={() => {
-              if (!value.trim()) return;
-              onSubmit(value);
-              setValue("");
-            }}
+            onClick={submitCurrent}
             disabled={disabled}
             className="ml-auto inline-flex items-center gap-2 rounded-xl bg-brand-gradient px-4 py-2 text-sm font-semibold text-white"
           >
