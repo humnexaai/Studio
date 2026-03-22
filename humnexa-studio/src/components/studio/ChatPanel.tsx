@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { nanoid } from "nanoid";
 import { useChatStore } from "@/store/chatStore";
@@ -21,6 +21,8 @@ type ChatPanelProps = {
   conversationId: string | null;
   initialMessages: ReturnType<typeof useChatStore.getState>["messages"];
   currentFiles: ProjectFile[];
+  autoApply: boolean;
+  onAutoApplyChange: (enabled: boolean) => void;
   onApplyFileChanges: (files: Array<{ path: string; content: string }>) => void;
   onRejectChanges: () => void;
 };
@@ -30,6 +32,8 @@ export function ChatPanel({
   conversationId,
   initialMessages,
   currentFiles,
+  autoApply,
+  onAutoApplyChange,
   onApplyFileChanges,
   onRejectChanges,
 }: ChatPanelProps): React.ReactElement {
@@ -48,6 +52,7 @@ export function ChatPanel({
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const [inputBlocked, setInputBlocked] = useState(false);
   const [keyWarning, setKeyWarning] = useState<string | null>(null);
+  const [diffToast, setDiffToast] = useState<string | null>(null);
 
   useEffect(() => {
     setInputBlocked(credits <= 0);
@@ -84,6 +89,30 @@ export function ChatPanel({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [streaming, queue.length]);
+
+  const latestAssistantMessage = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (messages[i].role === "assistant" && (messages[i].diffs?.length ?? 0) > 0) {
+        return messages[i];
+      }
+    }
+    return null;
+  }, [messages]);
+
+  useEffect(() => {
+    if (!autoApply) return;
+    const diffs = latestAssistantMessage?.diffs ?? [];
+    if (diffs.length === 0) return;
+    onApplyFileChanges(
+      diffs.map((diff) => ({
+        path: diff.filePath,
+        content: diff.after,
+      })),
+    );
+    setDiffToast(`Auto-applied ${diffs.length} file${diffs.length > 1 ? "s" : ""}.`);
+    const timer = window.setTimeout(() => setDiffToast(null), 2400);
+    return () => window.clearTimeout(timer);
+  }, [autoApply, latestAssistantMessage, onApplyFileChanges]);
 
   const handleSubmit = async (value: string): Promise<void> => {
     const hasApiKeyPattern = /(sk-[a-zA-Z0-9]{20,}|gsk_[a-zA-Z0-9]+|rzp_live_[a-zA-Z0-9]+)/.test(
@@ -122,15 +151,15 @@ export function ChatPanel({
     await runPrompt(value, mode);
   };
 
-  const applyDiffs = (
-    diffs: Array<{ filePath: string; after: string }>,
-  ): void => {
+  const applyDiffs = (diffs: Array<{ filePath: string; after: string }>): void => {
     onApplyFileChanges(
       diffs.map((diff) => ({
         path: diff.filePath,
         content: diff.after,
       })),
     );
+    setDiffToast(`${diffs.length} file${diffs.length > 1 ? "s" : ""} updated.`);
+    window.setTimeout(() => setDiffToast(null), 2200);
   };
 
   return (
@@ -151,15 +180,47 @@ export function ChatPanel({
                 key={diff.id}
                 filePath={diff.filePath}
                 summary={diff.summary}
-                onApply={() => applyDiffs([diff])}
-                onReject={onRejectChanges}
+                before={diff.before}
+                after={diff.after}
               />
             ))}
+            {message.id === latestAssistantMessage?.id &&
+            message.diffs &&
+            message.diffs.length > 0 &&
+            !autoApply ? (
+              <div className="rounded-xl border border-brand-border bg-brand-card2 p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => applyDiffs(message.diffs ?? [])}
+                    className="rounded-lg bg-brand-gradient px-3 py-1.5 text-xs font-semibold text-white"
+                  >
+                    Apply All Changes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onRejectChanges}
+                    className="rounded-lg border border-brand-border px-3 py-1.5 text-xs text-brand-sub"
+                  >
+                    Reject
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
         ))}
         {typing || streaming ? <TypingIndicator /> : null}
       </div>
       <div className="border-t border-brand-border p-3">
+        <label className="mb-2 flex items-center gap-2 text-xs text-brand-sub">
+          <input
+            type="checkbox"
+            checked={autoApply}
+            onChange={(event) => onAutoApplyChange(event.target.checked)}
+            className="accent-brand-or"
+          />
+          Auto-apply AI code changes
+        </label>
         <ChatInput
           onSubmit={(value) => void handleSubmit(value)}
           planMode={planMode}
@@ -204,6 +265,11 @@ export function ChatPanel({
       {keyWarning ? (
         <div className="border-t border-brand-border bg-brand-card2 px-4 py-3 text-sm text-brand-warn">
           {keyWarning}
+        </div>
+      ) : null}
+      {diffToast ? (
+        <div className="border-t border-brand-border bg-brand-card2 px-4 py-3 text-sm text-brand-gr">
+          {diffToast}
         </div>
       ) : null}
     </div>

@@ -195,16 +195,6 @@ export async function POST(req: Request): Promise<Response> {
             ? []
             : extractCodeDiffs(accumulatedText, parsed.currentFiles);
 
-          if (!planMode) {
-            for (const diff of diffs) {
-              await dbWriter.from("project_files").upsert?.({
-                project_id: parsed.projectId,
-                file_path: diff.filePath,
-                content: diff.after,
-              });
-            }
-          }
-
           if (parsed.conversationId && !planMode) {
             await dbWriter.from("conversations").update?.({
               updated_at: new Date().toISOString(),

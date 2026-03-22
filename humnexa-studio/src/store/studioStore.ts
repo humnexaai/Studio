@@ -12,6 +12,7 @@ type StudioStore = StudioPanelState & {
   setActiveTab: (tab: StudioTab) => void;
   setPreviewDevice: (device: StudioPanelState["previewDevice"]) => void;
   setPlanMode: (enabled: boolean) => void;
+  setAutoApply: (enabled: boolean) => void;
   enqueuePrompt: (item: QueueItem) => void;
   setQueue: (items: QueueItem[]) => void;
   removeQueueItem: (id: string) => void;
@@ -27,6 +28,7 @@ const initialState: StudioPanelState = {
   activeTab: "chat",
   previewDevice: "desktop",
   planMode: false,
+  autoApply: false,
   queue: [],
 };
 
@@ -60,6 +62,10 @@ export const useStudioStore = create<StudioStore>()(
     setPlanMode: (enabled) =>
       set((state) => {
         state.planMode = enabled;
+      }),
+    setAutoApply: (enabled) =>
+      set((state) => {
+        state.autoApply = enabled;
       }),
     enqueuePrompt: (item) =>
       set((state) => {

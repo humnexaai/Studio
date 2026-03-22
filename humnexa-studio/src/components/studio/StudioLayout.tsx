@@ -52,6 +52,11 @@ type DeployStreamEvent =
       issues?: Array<{ file: string; issue: string }>;
     };
 
+type DiffPatch = {
+  path: string;
+  content: string;
+};
+
 type StudioLayoutProps = {
   projectId: string;
   initialProjectName: string;
@@ -119,7 +124,7 @@ export function StudioLayout({
   } | null>(null);
   const pushTimeoutRef = useRef<number | null>(null);
   const saveTimeoutRef = useRef<Record<string, number>>({});
-  const {
+    const {
     chatWidth,
     previewWidth,
     chatCollapsed,
@@ -130,7 +135,22 @@ export function StudioLayout({
     togglePreviewCollapsed,
     enqueuePrompt,
     setPlanMode,
-  } = useStudioStore();
+    autoApply,
+      setAutoApply,
+    } = useStudioStore();
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem("humnexa-auto-apply");
+    if (stored === "true" || stored === "false") {
+      setAutoApply(stored === "true");
+    }
+  }, [setAutoApply]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("humnexa-auto-apply", autoApply ? "true" : "false");
+  }, [autoApply]);
   const credits = useUserStore((state) => state.credits);
 
   const activeFile = useMemo(
@@ -358,6 +378,26 @@ export function StudioLayout({
     }
   };
 
+  const syncDiffsToDatabase = async (changedFiles: DiffPatch[]): Promise<void> => {
+    const db = supabase as unknown as {
+      from: (table: string) => {
+        upsert: (values: Record<string, unknown>) => Promise<{
+          error: { message?: string } | null;
+        }>;
+      };
+    };
+    for (const changed of changedFiles) {
+      const { error } = await db.from("project_files").upsert({
+        project_id: projectId,
+        file_path: changed.path,
+        content: changed.content,
+      });
+      if (error) {
+        throw new Error(error.message ?? `Failed to update ${changed.path}`);
+      }
+    }
+  };
+
   const queueFixWithAI = (errorMessage: string): void => {
     const prompt = `Deployment failed with this error:\n${errorMessage}\nPlease fix the project files so deployment succeeds, then explain what changed.`;
     enqueuePrompt({
@@ -548,7 +588,10 @@ export function StudioLayout({
                 conversationId={initialConversationId}
                 initialMessages={initialMessages}
                 currentFiles={files}
+                autoApply={autoApply}
+                onAutoApplyChange={setAutoApply}
                 onApplyFileChanges={(changedFiles) => {
+                  void syncDiffsToDatabase(changedFiles);
                   setFiles((prev) => {
                     const map = new Map(prev.map((f) => [f.path, f]));
                     for (const changed of changedFiles) {

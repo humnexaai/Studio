@@ -52,6 +52,7 @@ export type StudioPanelState = {
   activeTab: StudioTab;
   previewDevice: PreviewDevice;
   planMode: boolean;
+  autoApply: boolean;
   queue: QueueItem[];
 };
 

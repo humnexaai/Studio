@@ -42,15 +42,17 @@ export function useChat() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let done = false;
+      let buffer = "";
 
       while (!done) {
         const { value, done: doneReading } = await reader.read();
         done = doneReading;
-        const chunk = decoder.decode(value ?? new Uint8Array(), {
+        buffer += decoder.decode(value ?? new Uint8Array(), {
           stream: !doneReading,
         });
 
-        const events = chunk.split("\n\n");
+        const events = buffer.split("\n\n");
+        buffer = events.pop() ?? "";
         for (const event of events) {
           if (!event.startsWith("data:")) continue;
           const payload = event.replace("data:", "").trim();
