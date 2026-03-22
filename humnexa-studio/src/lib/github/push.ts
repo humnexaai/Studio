@@ -15,6 +15,11 @@ type PushFilesInput = {
   message: string;
 };
 
+export type ParsedRepoRef = {
+  owner: string;
+  repo: string;
+};
+
 function getGitHubToken(): string {
   const token = process.env.GITHUB_TOKEN;
   if (!token) {
@@ -117,4 +122,29 @@ export async function pushFiles({
       );
     }
   }
+}
+
+export function parseRepoFullName(fullName: string): ParsedRepoRef {
+  const [owner, repo] = fullName.split("/");
+  if (!owner || !repo) {
+    throw new Error(`Invalid repository full name: ${fullName}`);
+  }
+  return { owner, repo };
+}
+
+export function parseGitHubRepoFromUrl(url: string): {
+  owner: string;
+  repo: string;
+  fullName: string;
+} {
+  const trimmed = url.trim().replace(/\.git$/, "");
+  const match = trimmed.match(/github\.com\/([^/]+)\/([^/]+)$/i);
+  if (!match) {
+    throw new Error("Invalid github_url format");
+  }
+  return {
+    owner: match[1],
+    repo: match[2],
+    fullName: `${match[1]}/${match[2]}`,
+  };
 }

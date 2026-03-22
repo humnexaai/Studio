@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { nanoid } from "nanoid";
 import { FileTree } from "@/components/studio/FileTree";
 import { ChatPanel } from "@/components/studio/ChatPanel";
 import { CodePanel } from "@/components/studio/CodePanel";
@@ -10,11 +11,46 @@ import { StudioNavbar } from "@/components/studio/StudioNavbar";
 import { ResizeDivider } from "@/components/studio/ResizeDivider";
 import { VersionHistory } from "@/components/studio/VersionHistory";
 import { StatusBar } from "@/components/studio/StatusBar";
+import { DeployModal } from "@/components/deploy/DeployModal";
 import { useStudioStore } from "@/store/studioStore";
 import { useUserStore } from "@/store/userStore";
 import { supabase } from "@/lib/supabase/client";
 import { detectLanguageFromPath } from "@/lib/studio/file-utils";
+import { estimateCredits } from "@/lib/credits/estimate";
 import type { ProjectFile } from "@/types/studio";
+
+type DeployStreamEvent =
+  | {
+      type: "step";
+      step: "security" | "build" | "deploy";
+      status: "running" | "success" | "failed";
+      message: string;
+    }
+  | {
+      type: "security_report";
+      critical: Array<{ file: string; issue: string }>;
+      high: Array<{ file: string; issue: string }>;
+      medium: Array<{ file: string; issue: string }>;
+      blockDeploy: boolean;
+    }
+  | {
+      type: "deploy_status";
+      readyState: string;
+      url: string | null;
+      deploymentId: string;
+    }
+  | {
+      type: "success";
+      deploymentId: string;
+      url: string;
+      message: string;
+    }
+  | {
+      type: "error";
+      code: string;
+      message: string;
+      issues?: Array<{ file: string; issue: string }>;
+    };
 
 type StudioLayoutProps = {
   projectId: string;
@@ -66,6 +102,21 @@ export function StudioLayout({
   const [pushLoading, setPushLoading] = useState(false);
   const [pushedRepoUrl, setPushedRepoUrl] = useState<string | null>(null);
   const [pushToast, setPushToast] = useState<string | null>(null);
+  const [deployOpen, setDeployOpen] = useState(false);
+  const [deployLoading, setDeployLoading] = useState(false);
+  const [deployLogs, setDeployLogs] = useState<string[]>([]);
+  const [deployStep, setDeployStep] = useState<"security" | "build" | "deploy">(
+    "security",
+  );
+  const [deployStatusText, setDeployStatusText] = useState("Ready to deploy.");
+  const [deployLiveUrl, setDeployLiveUrl] = useState<string | null>(null);
+  const [deployError, setDeployError] = useState<string | null>(null);
+  const [securityReport, setSecurityReport] = useState<{
+    critical: Array<{ file: string; issue: string }>;
+    high: Array<{ file: string; issue: string }>;
+    medium: Array<{ file: string; issue: string }>;
+    blockDeploy: boolean;
+  } | null>(null);
   const pushTimeoutRef = useRef<number | null>(null);
   const saveTimeoutRef = useRef<Record<string, number>>({});
   const {
@@ -77,6 +128,8 @@ export function StudioLayout({
     setActiveTab,
     toggleChatCollapsed,
     togglePreviewCollapsed,
+    enqueuePrompt,
+    setPlanMode,
   } = useStudioStore();
   const credits = useUserStore((state) => state.credits);
 
@@ -305,11 +358,149 @@ export function StudioLayout({
     }
   };
 
+  const queueFixWithAI = (errorMessage: string): void => {
+    const prompt = `Deployment failed with this error:\n${errorMessage}\nPlease fix the project files so deployment succeeds, then explain what changed.`;
+    enqueuePrompt({
+      id: nanoid(),
+      prompt,
+      mode: "agent",
+      estimatedCost: estimateCredits(prompt, "agent"),
+      createdAt: new Date().toISOString(),
+    });
+    setPlanMode(false);
+    setDeployOpen(false);
+    setPushToast("Queued deploy fix prompt for AI");
+    if (pushTimeoutRef.current) {
+      window.clearTimeout(pushTimeoutRef.current);
+    }
+    pushTimeoutRef.current = window.setTimeout(() => setPushToast(null), 3500);
+  };
+
+  const startDeploy = async (): Promise<void> => {
+    try {
+      setDeployOpen(true);
+      setDeployLoading(true);
+      setDeployStep("security");
+      setDeployStatusText("Starting deployment...");
+      setDeployLogs(["Starting deploy pipeline..."]);
+      setDeployLiveUrl(null);
+      setDeployError(null);
+      setSecurityReport(null);
+
+      const response = await fetch(`/api/projects/${projectId}/deploy`, {
+        method: "POST",
+      });
+
+      if (response.status === 400) {
+        const payload = (await response.json()) as {
+          error?: string;
+          issues?: Array<{ file: string; issue: string }>;
+        };
+        setDeployStep("security");
+        setDeployStatusText("Security scan failed.");
+        setDeployError(payload.error ?? "Security issues found.");
+        setSecurityReport({
+          critical: payload.issues ?? [],
+          high: [],
+          medium: [],
+          blockDeploy: true,
+        });
+        setDeployLogs((prev) => [...prev, "Deployment blocked by security scan."]);
+        return;
+      }
+
+      if (!response.ok || !response.body) {
+        const payload = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(payload.error ?? "Failed to start deployment");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let done = false;
+
+      while (!done) {
+        const { value, done: doneReading } = await reader.read();
+        done = doneReading;
+        buffer += decoder.decode(value ?? new Uint8Array(), {
+          stream: !doneReading,
+        });
+
+        const events = buffer.split("\n\n");
+        buffer = events.pop() ?? "";
+
+        for (const event of events) {
+          if (!event.startsWith("data:")) continue;
+          const payload = event.replace("data:", "").trim();
+          if (!payload || payload === "[DONE]") continue;
+          const parsed = JSON.parse(payload) as DeployStreamEvent;
+          if (parsed.type === "step") {
+            setDeployStep(parsed.step);
+            setDeployStatusText(parsed.message);
+            setDeployLogs((prev) => [...prev, parsed.message]);
+            continue;
+          }
+          if (parsed.type === "security_report") {
+            setSecurityReport({
+              critical: parsed.critical,
+              high: parsed.high,
+              medium: parsed.medium,
+              blockDeploy: parsed.blockDeploy,
+            });
+            continue;
+          }
+          if (parsed.type === "deploy_status") {
+            setDeployLogs((prev) => [
+              ...prev,
+              `Deploy status: ${parsed.readyState}${
+                parsed.url ? ` (${parsed.url})` : ""
+              }`,
+            ]);
+            continue;
+          }
+          if (parsed.type === "success") {
+            setDeployLiveUrl(parsed.url);
+            setDeployError(null);
+            setDeployStatusText(parsed.message);
+            setDeployLogs((prev) => [...prev, parsed.message]);
+            continue;
+          }
+          if (parsed.type === "error") {
+            setDeployError(parsed.message);
+            setDeployStatusText(parsed.message);
+            setDeployLogs((prev) => [...prev, parsed.message]);
+            if (parsed.code === "SECURITY_ISSUES") {
+              setDeployStep("security");
+              setSecurityReport({
+                critical: parsed.issues ?? [],
+                high: [],
+                medium: [],
+                blockDeploy: true,
+              });
+            }
+            if (parsed.code === "DEPLOY_FAILED" || parsed.code === "DEPLOY_TIMEOUT") {
+              setDeployStep("deploy");
+            }
+          }
+        }
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Deployment failed unexpectedly";
+      setDeployError(message);
+      setDeployStatusText(message);
+      setDeployLogs((prev) => [...prev, message]);
+    } finally {
+      setDeployLoading(false);
+    }
+  };
+
   return (
     <div className="flex min-h-screen flex-col bg-brand-bg">
       <StudioNavbar
         projectName={projectName}
         credits={credits}
+        onDeploy={() => setDeployOpen(true)}
         onPush={() => {
           void pushToGitHub();
         }}
@@ -438,6 +629,23 @@ export function StudioLayout({
             document.body,
           )
         : null}
+      <DeployModal
+        open={deployOpen}
+        logs={deployLogs}
+        statusText={deployStatusText}
+        currentStep={deployStep}
+        loading={deployLoading}
+        liveUrl={deployLiveUrl}
+        errorMessage={deployError}
+        securityReport={securityReport}
+        onStart={() => {
+          void startDeploy();
+        }}
+        onFixWithAI={queueFixWithAI}
+        onClose={() => {
+          if (!deployLoading) setDeployOpen(false);
+        }}
+      />
     </div>
   );
 }

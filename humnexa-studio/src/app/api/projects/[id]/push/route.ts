@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServer } from "@/lib/supabase/server";
-import { createRepo, pushFiles } from "@/lib/github/push";
+import {
+  createRepo,
+  parseGitHubRepoFromUrl,
+  parseRepoFullName,
+  pushFiles,
+} from "@/lib/github/push";
 
 type Ctx = {
   params: {
@@ -107,15 +112,15 @@ export async function POST(
         github_url: repoUrl,
         github_full_name: fullName,
       }).eq("id", project.id);
+    } else if (!fullName && repoUrl) {
+      const parsedRepo = parseGitHubRepoFromUrl(repoUrl);
+      fullName = parsedRepo.fullName;
+      await db.from("projects").update({
+        github_full_name: fullName,
+      }).eq("id", project.id);
     }
 
-    const [owner, repo] = fullName.split("/");
-    if (!owner || !repo) {
-      return NextResponse.json(
-        { error: "Invalid GitHub repository name" },
-        { status: 400 },
-      );
-    }
+    const { owner, repo } = parseRepoFullName(fullName);
 
     await pushFiles({
       owner,

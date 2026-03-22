@@ -74,7 +74,9 @@ export type Database = {
           status: string;
           github_url: string | null;
           github_full_name?: string | null;
+          vercel_project_id?: string | null;
           deployed_url: string | null;
+          branch_name?: string;
           created_at: string;
           updated_at: string;
         };
@@ -163,6 +165,24 @@ export type Database = {
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["credit_transactions"]["Row"]>;
+      };
+      deployments: {
+        Row: {
+          id: string;
+          project_id: string;
+          provider: string;
+          status: string;
+          logs: string | null;
+          deployed_url: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["deployments"]["Row"], "id" | "created_at" | "updated_at"> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["deployments"]["Row"]>;
       };
     };
     Views: Record<string, never>;
