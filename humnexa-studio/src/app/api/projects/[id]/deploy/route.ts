@@ -27,7 +27,17 @@ export async function POST(
     const body = await req.json();
     deploySchema.parse(body);
 
-    const { data: files, error: fileError } = await supabase
+    const dbReader = supabase as unknown as {
+      from: (table: string) => {
+        select: (columns: string) => {
+          eq: (column: string, value: string) => Promise<{
+            data: Array<{ file_path: string; content: string }> | null;
+            error: { message?: string } | null;
+          }>;
+        };
+      };
+    };
+    const { data: files, error: fileError } = await dbReader
       .from("project_files")
       .select("file_path, content")
       .eq("project_id", params.id);
@@ -50,7 +60,12 @@ export async function POST(
       const deployment = await triggerVercelDeploy(params.id);
       await deductCreditsOnSuccess(user.id, deployCost, "deploy");
 
-      await supabase.from("deployments").insert({
+      const dbWriter = supabase as unknown as {
+        from: (table: string) => {
+          insert: (values: Record<string, unknown>) => Promise<unknown>;
+        };
+      };
+      await dbWriter.from("deployments").insert({
         project_id: params.id,
         status: "success",
         logs: "Deployed via Vercel API",

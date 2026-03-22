@@ -5,12 +5,14 @@ import Editor from "@monaco-editor/react";
 interface CodePanelProps {
   path: string;
   content: string;
+  language: string;
   onChange: (value: string) => void;
 }
 
 export function CodePanel({
   path,
   content,
+  language,
   onChange,
 }: CodePanelProps): React.ReactElement {
   return (
@@ -26,7 +28,7 @@ export function CodePanel({
       </div>
       <Editor
         height="calc(100% - 38px)"
-        defaultLanguage="typescript"
+        language={language}
         theme="vs-dark"
         value={content}
         onChange={(value) => onChange(value ?? "")}

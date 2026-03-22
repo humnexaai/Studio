@@ -2,14 +2,22 @@
 
 import { RotateCcw, Star } from "lucide-react";
 
-const versions = Array.from({ length: 6 }).map((_, index) => ({
-  id: `v-${index + 1}`,
-  label: `Version #${index + 1}`,
-  createdAt: `${index + 1}h ago`,
-  bookmarked: index === 1,
-}));
+type VersionItem = {
+  id: string;
+  label: string;
+  createdAt: string;
+  bookmarked: boolean;
+};
 
-export function VersionHistory(): React.ReactElement {
+type VersionHistoryProps = {
+  versions: VersionItem[];
+  onRestore: (versionId: string) => void;
+};
+
+export function VersionHistory({
+  versions,
+  onRestore,
+}: VersionHistoryProps): React.ReactElement {
   return (
     <aside className="h-full w-80 overflow-y-auto border-r border-brand-border bg-brand-card p-3">
       <h3 className="mb-3 text-sm font-semibold text-brand-text">Version History</h3>
@@ -28,7 +36,11 @@ export function VersionHistory(): React.ReactElement {
               </button>
             </div>
             <p className="mt-1 text-xs text-brand-muted">{item.createdAt}</p>
-            <button className="mt-2 inline-flex items-center gap-1 text-xs text-brand-gr">
+            <button
+              type="button"
+              onClick={() => onRestore(item.id)}
+              className="mt-2 inline-flex items-center gap-1 text-xs text-brand-gr"
+            >
               <RotateCcw className="h-3.5 w-3.5" />
               Restore
             </button>

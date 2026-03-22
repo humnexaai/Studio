@@ -8,9 +8,23 @@ type ChatState = {
   messages: ChatMessage[];
   typing: boolean;
   streamingMessageId: string | null;
+  pendingDiffs: ChatMessage["diffs"];
+  streamMeta: {
+    creditsUsed: number;
+    planMode: boolean;
+    implementPrompt: string | null;
+  } | null;
   addMessage: (role: ChatMessage["role"], content: string) => void;
+  setMessages: (messages: ChatMessage[]) => void;
   setTyping: (typing: boolean) => void;
   upsertStreamingMessage: (chunk: string) => void;
+  setPendingDiffs: (diffs: ChatMessage["diffs"]) => void;
+  setStreamMeta: (meta: {
+    creditsUsed: number;
+    planMode: boolean;
+    implementPrompt: string | null;
+  }) => void;
+  clearPending: () => void;
   finishStreamingMessage: () => void;
   clear: () => void;
 };
@@ -19,6 +33,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   messages: [],
   typing: false,
   streamingMessageId: null,
+  pendingDiffs: [],
+  streamMeta: null,
   addMessage: (role, content) =>
     set((state) => ({
       messages: [
@@ -31,6 +47,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         },
       ],
     })),
+  setMessages: (messages) => set({ messages }),
   setTyping: (typing) => set({ typing }),
   upsertStreamingMessage: (chunk) => {
     const { streamingMessageId } = get();
@@ -59,8 +76,39 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       ),
     }));
   },
+  setPendingDiffs: (diffs) => set({ pendingDiffs: diffs ?? [] }),
+  setStreamMeta: (meta) => set({ streamMeta: meta }),
+  clearPending: () => set({ pendingDiffs: [], streamMeta: null }),
   finishStreamingMessage: () => {
-    set({ streamingMessageId: null, typing: false });
+    const { streamingMessageId, messages, pendingDiffs, streamMeta } = get();
+    if (!streamingMessageId) {
+      set({ typing: false });
+      return;
+    }
+    set({
+      streamingMessageId: null,
+      typing: false,
+      pendingDiffs: [],
+      streamMeta: null,
+      messages: messages.map((msg) =>
+        msg.id === streamingMessageId
+          ? {
+              ...msg,
+              diffs: pendingDiffs ?? [],
+              creditsUsed: streamMeta?.creditsUsed,
+              planMode: streamMeta?.planMode,
+              implementPrompt: streamMeta?.implementPrompt ?? undefined,
+            }
+          : msg,
+      ),
+    });
   },
-  clear: () => set({ messages: [], streamingMessageId: null, typing: false }),
+  clear: () =>
+    set({
+      messages: [],
+      streamingMessageId: null,
+      typing: false,
+      pendingDiffs: [],
+      streamMeta: null,
+    }),
 }));

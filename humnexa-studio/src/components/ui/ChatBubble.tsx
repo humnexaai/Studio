@@ -5,9 +5,13 @@ import type { ChatMessage } from "@/types/studio";
 
 interface ChatBubbleProps {
   message: ChatMessage;
+  onImplementPlan?: (prompt: string) => void;
 }
 
-export function ChatBubble({ message }: ChatBubbleProps): React.ReactElement {
+export function ChatBubble({
+  message,
+  onImplementPlan,
+}: ChatBubbleProps): React.ReactElement {
   const isUser = message.role === "user";
 
   return (
@@ -21,6 +25,15 @@ export function ChatBubble({ message }: ChatBubbleProps): React.ReactElement {
         )}
       >
         <p className="whitespace-pre-wrap">{message.content}</p>
+        {message.planMode && message.implementPrompt ? (
+          <button
+            type="button"
+            onClick={() => onImplementPlan?.(message.implementPrompt!)}
+            className="mt-3 rounded-md bg-brand-gradient px-2.5 py-1.5 text-xs font-semibold text-white"
+          >
+            Implement this plan
+          </button>
+        ) : null}
         <p className="mt-2 text-[11px] text-brand-sub">
           {new Date(message.createdAt).toLocaleTimeString("en-IN", {
             hour: "2-digit",

@@ -1,5 +1,6 @@
-import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowRight, Mic, Paperclip, Sparkles } from "lucide-react";
+import { createSupabaseServer } from "@/lib/supabase/server";
 
 const promptChips = [
   "Build me a GST billing dashboard with invoice PDF",
@@ -17,6 +18,33 @@ const projectCards = [
 ];
 
 export default function Home(): React.ReactElement {
+  async function handleBuild(formData: FormData): Promise<void> {
+    "use server";
+    const idea = String(formData.get("idea") ?? "").trim();
+    const framework = String(formData.get("framework") ?? "nextjs").trim();
+    const supabase = createSupabaseServer();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      redirect("/auth");
+    }
+    const { data } = await supabase
+      .from("projects")
+      .insert({
+        user_id: user.id,
+        name: idea ? idea.slice(0, 60) : "New Project",
+        framework,
+        status: "idle",
+      })
+      .select("id")
+      .single();
+    if (!data?.id) {
+      redirect("/dashboard");
+    }
+    redirect(`/studio/${data.id}`);
+  }
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-brand-bg px-6 py-10">
       <div className="pointer-events-none absolute inset-0 opacity-35">
@@ -40,34 +68,44 @@ export default function Home(): React.ReactElement {
         </div>
 
         <section className="rounded-3xl border border-brand-border bg-brand-card p-4 shadow-2xl shadow-brand-or/10 md:p-6">
-          <textarea
-            rows={4}
-            placeholder="Describe your app idea. Example: Build a GST-compliant invoicing app with UPI checkout and WhatsApp sharing..."
-            className="w-full resize-none rounded-2xl border border-brand-border bg-brand-card2 p-4 text-sm text-brand-text outline-none ring-brand-or transition focus:ring-2"
-          />
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <select
-              defaultValue="nextjs"
-              className="rounded-xl border border-brand-border bg-brand-card2 px-3 py-2 text-sm text-brand-sub outline-none"
-            >
-              <option value="nextjs">Next.js</option>
-              <option value="react">React</option>
-              <option value="vue">Vue</option>
-            </select>
-            <button className="rounded-xl border border-brand-border bg-brand-card2 p-2 text-brand-sub transition hover:text-brand-text">
-              <Mic className="h-4 w-4" />
-            </button>
-            <button className="rounded-xl border border-brand-border bg-brand-card2 p-2 text-brand-sub transition hover:text-brand-text">
-              <Paperclip className="h-4 w-4" />
-            </button>
-            <Link
-              href="/studio/new"
-              className="ml-auto inline-flex items-center gap-2 rounded-xl bg-brand-gradient px-4 py-2 font-semibold text-white transition hover:opacity-90"
-            >
-              Build it 🚀
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
+          <form action={handleBuild}>
+            <textarea
+              name="idea"
+              rows={4}
+              placeholder="Describe your app idea. Example: Build a GST-compliant invoicing app with UPI checkout and WhatsApp sharing..."
+              className="w-full resize-none rounded-2xl border border-brand-border bg-brand-card2 p-4 text-sm text-brand-text outline-none ring-brand-or transition focus:ring-2"
+            />
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <select
+                name="framework"
+                defaultValue="nextjs"
+                className="rounded-xl border border-brand-border bg-brand-card2 px-3 py-2 text-sm text-brand-sub outline-none"
+              >
+                <option value="nextjs">Next.js</option>
+                <option value="react">React</option>
+                <option value="vue">Vue</option>
+              </select>
+              <button
+                type="button"
+                className="rounded-xl border border-brand-border bg-brand-card2 p-2 text-brand-sub transition hover:text-brand-text"
+              >
+                <Mic className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                className="rounded-xl border border-brand-border bg-brand-card2 p-2 text-brand-sub transition hover:text-brand-text"
+              >
+                <Paperclip className="h-4 w-4" />
+              </button>
+              <button
+                type="submit"
+                className="ml-auto inline-flex items-center gap-2 rounded-xl bg-brand-gradient px-4 py-2 font-semibold text-white transition hover:opacity-90"
+              >
+                Build it 🚀
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+          </form>
         </section>
 
         <section className="flex gap-3 overflow-x-auto pb-2">

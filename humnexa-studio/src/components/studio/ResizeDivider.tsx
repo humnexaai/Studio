@@ -5,13 +5,16 @@ import { cn } from "@/lib/utils";
 
 type ResizeDividerProps = {
   dragging?: boolean;
+  onMouseDown?: (event: React.MouseEvent<HTMLDivElement>) => void;
 };
 
 export function ResizeDivider({
   dragging = false,
+  onMouseDown,
 }: ResizeDividerProps): React.ReactElement {
   return (
     <div
+      onMouseDown={onMouseDown}
       className={cn(
         "group relative w-1.5 cursor-col-resize rounded-full bg-brand-border transition",
         dragging && "bg-brand-or shadow-[0_0_20px_rgba(255,107,44,0.55)]"

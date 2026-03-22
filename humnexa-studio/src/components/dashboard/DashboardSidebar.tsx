@@ -12,7 +12,17 @@ const navItems = [
   { href: "/settings", label: "Settings" },
 ];
 
-export function DashboardSidebar(): React.ReactElement {
+type DashboardSidebarProps = {
+  userId: string;
+  creditBalance: number;
+  planLimit: number;
+};
+
+export function DashboardSidebar({
+  userId,
+  creditBalance,
+  planLimit,
+}: DashboardSidebarProps): React.ReactElement {
   return (
     <aside className="flex h-screen w-[220px] flex-col border-r border-brand-border bg-brand-surf p-4">
       <Logo />
@@ -28,10 +38,13 @@ export function DashboardSidebar(): React.ReactElement {
         ))}
       </nav>
       <div className="mt-auto rounded-xl border border-brand-border bg-brand-card p-3">
-        <CreditBar balance={847} cap={2500} />
-        <button className="mt-3 w-full rounded-lg bg-brand-gradient px-3 py-2 text-sm font-semibold text-white">
+        <CreditBar userId={userId} balance={creditBalance} cap={planLimit} />
+        <Link
+          href="/billing"
+          className="mt-3 block w-full rounded-lg bg-brand-gradient px-3 py-2 text-center text-sm font-semibold text-white"
+        >
           Upgrade
-        </button>
+        </Link>
       </div>
     </aside>
   );

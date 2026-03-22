@@ -30,6 +30,8 @@ export type ChatMessage = {
   createdAt: string;
   diffs?: DiffBlock[];
   creditsUsed?: number;
+  planMode?: boolean;
+  implementPrompt?: string;
 };
 
 export type QueueItem = {

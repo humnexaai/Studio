@@ -33,7 +33,14 @@ export async function POST(request: Request): Promise<Response> {
       receipt: input.receipt,
     };
 
-    const { error } = await supabase.from("payment_orders").insert(paymentOrder);
+    const db = supabase as unknown as {
+      from: (table: string) => {
+        insert: (values: Record<string, unknown>) => Promise<{
+          error: { message?: string } | null;
+        }>;
+      };
+    };
+    const { error } = await db.from("payment_orders").insert(paymentOrder);
     if (error) throw error;
 
     return Response.json({

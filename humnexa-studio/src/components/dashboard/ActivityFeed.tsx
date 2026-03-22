@@ -2,7 +2,7 @@ type ActivityItem = {
   id: string;
   title: string;
   time: string;
-  type: "build" | "deploy" | "billing" | "project";
+  type: "build" | "deploy" | "billing" | "project" | "usage" | "purchase" | "refund" | "bonus";
 };
 
 export function ActivityFeed({

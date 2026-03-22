@@ -31,11 +31,69 @@ function resetCircuit(provider: ProviderName): void {
   failures.delete(provider);
 }
 
+type NormalizedChunk = {
+  text: string;
+};
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("PROVIDER_TIMEOUT")), ms);
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
+}
+
+async function* normalizeGroqStream(
+  stream: AsyncIterable<{
+    choices?: Array<{ delta?: { content?: string | null } }>;
+  }>,
+): AsyncIterable<NormalizedChunk> {
+  for await (const chunk of stream) {
+    const text = chunk.choices?.[0]?.delta?.content ?? "";
+    if (!text) continue;
+    yield { text };
+  }
+}
+
+async function* normalizeAnthropicStream(
+  stream: AsyncIterable<unknown>,
+): AsyncIterable<NormalizedChunk> {
+  for await (const chunk of stream) {
+    const event = chunk as {
+      type?: string;
+      delta?: { text?: string };
+    };
+    if (event.type !== "content_block_delta") continue;
+    const text = event.delta?.text ?? "";
+    if (!text) continue;
+    yield { text };
+  }
+}
+
+async function* normalizeOpenAIStream(
+  stream: AsyncIterable<{
+    choices?: Array<{ delta?: { content?: string | null } }>;
+  }>,
+): AsyncIterable<NormalizedChunk> {
+  for await (const chunk of stream) {
+    const text = chunk.choices?.[0]?.delta?.content ?? "";
+    if (!text) continue;
+    yield { text };
+  }
+}
+
 async function callProvider(
   provider: ProviderName,
   messages: RouterMessage[],
   system: string,
-) {
+): Promise<AsyncIterable<NormalizedChunk>> {
   const groqClient = process.env.GROQ_API_KEY
     ? new Groq({ apiKey: process.env.GROQ_API_KEY })
     : null;
@@ -52,37 +110,47 @@ async function callProvider(
     if (!groqClient) {
       throw new Error("GROQ_API_KEY_MISSING");
     }
-    return groqClient.chat.completions.create({
-      model: process.env.GROQ_MODEL ?? "llama-3.1-70b-versatile",
-      stream: true,
-      messages: merged,
-    });
+    const groqStream = await withTimeout(
+      groqClient.chat.completions.create({
+        model: process.env.GROQ_MODEL ?? "llama-3.1-70b-versatile",
+        stream: true,
+        messages: merged,
+        max_tokens: 4096,
+      }),
+      30_000,
+    );
+    return normalizeGroqStream(groqStream);
   }
 
   if (provider === "claude") {
     if (!anthropicClient) {
       throw new Error("ANTHROPIC_API_KEY_MISSING");
     }
-    const stream = await anthropicClient.messages.stream({
-      model: process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-5",
-      max_tokens: 4096,
-      system,
-      messages: messages.map((m) => ({
-        role: m.role === "assistant" ? "assistant" : "user",
-        content: m.content,
-      })),
-    });
-    return stream;
+    const stream = anthropicClient.messages.stream({
+        model: process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-5",
+        max_tokens: 4096,
+        system,
+        messages: messages.map((m) => ({
+          role: m.role === "assistant" ? "assistant" : "user",
+          content: m.content,
+        })),
+      });
+    return normalizeAnthropicStream(stream);
   }
 
   if (!openaiClient) {
     throw new Error("OPENAI_API_KEY_MISSING");
   }
-  return openaiClient.chat.completions.create({
-    model: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
-    stream: true,
-    messages: merged,
-  });
+  const openAIStream = await withTimeout(
+    openaiClient.chat.completions.create({
+      model: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
+      stream: true,
+      messages: merged,
+      max_tokens: 4096,
+    }),
+    60_000,
+  );
+  return normalizeOpenAIStream(openAIStream);
 }
 
 export async function routeAI(messages: RouterMessage[], system: string) {

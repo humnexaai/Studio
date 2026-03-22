@@ -10,6 +10,7 @@ type ChatInputProps = {
   onSubmit: (value: string) => void;
   planMode: boolean;
   onPlanModeChange: (enabled: boolean) => void;
+  disabled?: boolean;
 };
 
 const keyRegex = /(sk-[a-zA-Z0-9]{20,}|gsk_[a-zA-Z0-9]+|rzp_live_[a-zA-Z0-9]+)/;
@@ -18,6 +19,7 @@ export function ChatInput({
   onSubmit,
   planMode,
   onPlanModeChange,
+  disabled = false,
 }: ChatInputProps): React.ReactElement {
   const [value, setValue] = useState("");
   const keyDetected = keyRegex.test(value);
@@ -38,6 +40,7 @@ export function ChatInput({
           onChange={(event) => setValue(event.target.value)}
           placeholder="Describe what to build or fix..."
           rows={3}
+          disabled={disabled}
           className="w-full resize-none bg-transparent text-sm outline-none"
         />
         <div className="mt-2 flex items-center gap-2">
@@ -53,6 +56,7 @@ export function ChatInput({
               onSubmit(value);
               setValue("");
             }}
+            disabled={disabled}
             className="ml-auto inline-flex items-center gap-2 rounded-xl bg-brand-gradient px-4 py-2 text-sm font-semibold text-white"
           >
             Send

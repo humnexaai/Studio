@@ -6,11 +6,18 @@ type ProjectCardProps = {
     name: string;
     status: string;
     framework: string;
+    updated_at?: string;
     updatedAt?: string;
   };
 };
 
 export function ProjectCard({ project }: ProjectCardProps): React.ReactElement {
+  const updatedText = project.updatedAt
+    ? `Updated ${project.updatedAt}`
+    : project.updated_at
+      ? `Updated ${new Date(project.updated_at).toLocaleString("en-IN")}`
+      : null;
+
   return (
     <Link
       href={`/studio/${project.id}`}
@@ -23,9 +30,7 @@ export function ProjectCard({ project }: ProjectCardProps): React.ReactElement {
         {project.name}
       </h3>
       <p className="mt-1 text-sm text-brand-muted">{project.framework}</p>
-      {project.updatedAt ? (
-        <p className="mt-2 text-xs text-brand-muted">Updated {project.updatedAt}</p>
-      ) : null}
+      {updatedText ? <p className="mt-2 text-xs text-brand-muted">{updatedText}</p> : null}
     </Link>
   );
 }

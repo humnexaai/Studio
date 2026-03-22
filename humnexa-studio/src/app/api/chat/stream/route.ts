@@ -5,56 +5,61 @@ import { buildPlanModePrompt } from "@/lib/ai/plan-mode-prompt";
 import { buildSystemPrompt } from "@/lib/ai/system-prompt";
 import { extractCodeDiffs } from "@/lib/ai/extract-diffs";
 import { routeAI } from "@/lib/ai/router";
-import { deductCreditsOnSuccess, estimateCredits } from "@/lib/credits/deduct";
-import { preFlightCheck } from "@/lib/credits/preflight";
-import { refundCreditsOnFailure } from "@/lib/credits/refund";
-import type { ProjectFile } from "@/types/studio";
+import { deductCreditsOnSuccess } from "@/lib/credits/deduct";
+import { estimateCredits } from "@/lib/credits/estimate";
 
 const schema = z.object({
   projectId: z.string().uuid(),
   conversationId: z.string().uuid().nullable(),
   message: z.string().min(2),
   mode: z.enum(["agent", "plan"]).default("agent"),
+  planMode: z.boolean().optional(),
   currentFiles: z.array(
     z.object({
-      id: z.string(),
+      id: z.string().optional(),
       path: z.string(),
       content: z.string(),
       language: z.string().default("typescript"),
-      updatedAt: z.string(),
+      updatedAt: z.string().optional(),
     }),
   ),
 });
 
-const fixAttempts = new Map<string, number>();
-
-function detectLoop(projectId: string, errorHash: string): {
-  blocked: boolean;
-  message?: string;
-  refundCredits?: boolean;
-} {
-  const key = `${projectId}:${errorHash}`;
-  const n = (fixAttempts.get(key) ?? 0) + 1;
-  fixAttempts.set(key, n);
-  if (n >= 3) {
-    return {
-      blocked: true,
-      message: "AI has tried 3 times. Manual fix needed.",
-      refundCredits: true,
-    };
-  }
-  return { blocked: false };
-}
-
-async function snapshotBeforeGeneration(
-  projectId: string,
-  files: ProjectFile[],
-): Promise<void> {
+async function snapshotBeforeGeneration(projectId: string): Promise<void> {
   const supabase = createSupabaseServer();
-  await supabase.from("project_versions").insert({
+  const db = supabase as unknown as {
+    from: (table: string) => {
+      select: (columns: string) => {
+        eq: (column: string, value: string) => {
+          order: (
+            column: string,
+            options?: { ascending?: boolean },
+          ) => Promise<{
+            data: Array<{ file_path: string; content: string }> | null;
+          }>;
+        };
+      };
+    };
+  };
+  const dbWriter = supabase as unknown as {
+    from: (table: string) => {
+      insert: (values: Record<string, unknown>) => Promise<unknown>;
+    };
+  };
+  const { data: files } = await db
+    .from("project_files")
+    .select("file_path, content")
+    .eq("project_id", projectId)
+    .order("file_path", { ascending: true });
+  const snapshot =
+    files?.map((file) => ({
+      path: file.file_path,
+      content: file.content,
+    })) ?? [];
+  await dbWriter.from("project_versions").insert({
     project_id: projectId,
     label: `Snapshot ${new Date().toISOString()}`,
-    snapshot: files,
+    snapshot,
     bookmarked: false,
   });
 }
@@ -64,23 +69,37 @@ async function saveMessage(
   role: "assistant" | "user",
   content: string,
   diffs: ReturnType<typeof extractCodeDiffs>,
+  creditsUsed: number,
 ): Promise<void> {
   if (!conversationId) {
     return;
   }
   const supabase = createSupabaseServer();
-  await supabase.from("messages").insert({
+  const dbWriter = supabase as unknown as {
+    from: (table: string) => {
+      insert: (values: Record<string, unknown>) => Promise<unknown>;
+    };
+  };
+  await dbWriter.from("messages").insert({
     conversation_id: conversationId,
     role,
     content,
     code_diffs: diffs,
-    credits_used: 0,
+    credits_used: creditsUsed,
   });
 }
 
 export async function POST(req: Request): Promise<Response> {
   try {
     const supabase = createSupabaseServer();
+    const dbWriter = supabase as unknown as {
+      from: (table: string) => {
+        upsert?: (values: Record<string, unknown>) => Promise<unknown>;
+        update?: (values: Record<string, unknown>) => {
+          eq: (column: string, value: string) => Promise<unknown>;
+        };
+      };
+    };
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -90,22 +109,70 @@ export async function POST(req: Request): Promise<Response> {
     }
 
     const parsed = schema.parse(await req.json());
-    const estimatedCost = estimateCredits(parsed.message, parsed.mode);
-    await preFlightCheck(user.id, estimatedCost);
-    await snapshotBeforeGeneration(parsed.projectId, parsed.currentFiles);
+    const planMode = parsed.planMode ?? parsed.mode === "plan";
+    const estimatedCost = planMode ? 0 : estimateCredits(parsed.message, "agent");
+
+    if (!planMode) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("credits_balance")
+        .eq("id", user.id)
+        .single();
+      const typedProfile = profile as { credits_balance?: number | null } | null;
+      const balance = typedProfile?.credits_balance ?? 0;
+      if (balance < estimatedCost) {
+        return Response.json(
+          {
+            error: "INSUFFICIENT_CREDITS",
+            balance,
+          },
+          { status: 402 },
+        );
+      }
+      await snapshotBeforeGeneration(parsed.projectId);
+    }
+
+    await saveMessage(parsed.conversationId, "user", parsed.message, [], 0);
+
+    const currentFilesForPrompt = parsed.currentFiles.map((file) => ({
+      id: file.id ?? `${parsed.projectId}:${file.path}`,
+      path: file.path,
+      content: file.content,
+      language: file.language,
+      updatedAt: file.updatedAt ?? new Date().toISOString(),
+    }));
 
     const systemPrompt =
-      parsed.mode === "plan"
+      planMode
         ? buildPlanModePrompt()
         : buildSystemPrompt(
-            parsed.currentFiles,
-            parsed.mode,
+            currentFilesForPrompt,
+            "agent",
             `Project ${parsed.projectId.slice(0, 8)}`,
             "nextjs",
           );
 
+    type HistoryMessage = { role: string; content: string };
+    let conversationHistory: Array<{ role: "user" | "assistant"; content: string }> = [];
+    if (parsed.conversationId) {
+      const historyResponse = await supabase
+        .from("messages")
+        .select("role,content")
+        .eq("conversation_id", parsed.conversationId)
+        .order("created_at", { ascending: true })
+        .limit(30);
+      const history = (historyResponse.data as HistoryMessage[] | null) ?? [];
+      conversationHistory =
+        history
+          ?.filter((m) => m.role === "user" || m.role === "assistant")
+          .map((m) => ({
+            role: m.role as "user" | "assistant",
+            content: m.content,
+          })) ?? [];
+    }
+
     const { result } = await routeAI(
-      [{ role: "user", content: parsed.message }],
+      [...conversationHistory, { role: "user", content: parsed.message }],
       systemPrompt,
     );
 
@@ -115,12 +182,8 @@ export async function POST(req: Request): Promise<Response> {
     const readable = new ReadableStream({
       async start(controller) {
         try {
-          for await (const chunk of result as AsyncIterable<{
-            choices?: Array<{ delta?: { content?: string } }>;
-            delta?: { text?: string };
-          }>) {
-            const text =
-              chunk.choices?.[0]?.delta?.content ?? chunk.delta?.text ?? "";
+          for await (const chunk of result as AsyncIterable<{ text: string }>) {
+            const text = chunk.text ?? "";
             if (!text) continue;
             accumulatedText += text;
             controller.enqueue(
@@ -128,41 +191,68 @@ export async function POST(req: Request): Promise<Response> {
             );
           }
 
-          const loopResult = detectLoop(parsed.projectId, accumulatedText.slice(0, 40));
-          if (loopResult.blocked) {
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({ warning: loopResult.message })}\n\n`,
-              ),
-            );
-            if (loopResult.refundCredits && estimatedCost > 0) {
-              await refundCreditsOnFailure(user.id, estimatedCost, "Fix loop detected");
-            }
-          } else {
-            const diffs = extractCodeDiffs(accumulatedText);
-            await saveMessage(
-              parsed.conversationId,
-              "assistant",
-              accumulatedText,
-              diffs,
-            );
+          const diffs = planMode
+            ? []
+            : extractCodeDiffs(accumulatedText, parsed.currentFiles);
 
-            if (parsed.mode === "agent" && estimatedCost > 0) {
-              await deductCreditsOnSuccess(
-                user.id,
-                estimatedCost,
-                "AI generation success",
-              );
+          if (!planMode) {
+            for (const diff of diffs) {
+              await dbWriter.from("project_files").upsert?.({
+                project_id: parsed.projectId,
+                file_path: diff.filePath,
+                content: diff.after,
+              });
             }
           }
+
+          if (parsed.conversationId && !planMode) {
+            await dbWriter.from("conversations").update?.({
+              updated_at: new Date().toISOString(),
+            }).eq("id", parsed.conversationId);
+          }
+
+          await saveMessage(
+            parsed.conversationId,
+            "assistant",
+            accumulatedText,
+            diffs,
+            planMode ? 0 : estimatedCost,
+          );
+
+          if (!planMode && estimatedCost > 0) {
+            await deductCreditsOnSuccess(
+              user.id,
+              estimatedCost,
+              "AI generation success",
+            );
+          }
+
+          if (diffs.length > 0) {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ diffs })}\n\n`,
+              ),
+            );
+          }
+
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                meta: {
+                  creditsUsed: planMode ? 0 : estimatedCost,
+                  planMode,
+                  implementPrompt: planMode
+                    ? "Implement this plan in build mode."
+                    : null,
+                },
+              })}\n\n`,
+            ),
+          );
 
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();
         } catch (error) {
           Sentry.captureException(error);
-          if (parsed.mode === "agent" && estimatedCost > 0) {
-            await refundCreditsOnFailure(user.id, estimatedCost, "AI generation failure");
-          }
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({ error: "Streaming failed" })}\n\n`,

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useChatStore } from "@/store/chatStore";
+import type { DiffBlock } from "@/types/studio";
 
 type StreamChatInput = {
   projectId: string;
@@ -15,9 +16,15 @@ export function useChat() {
   const [streaming, setStreaming] = useState(false);
   const upsertStreamingMessage = useChatStore((s) => s.upsertStreamingMessage);
   const finishStreamingMessage = useChatStore((s) => s.finishStreamingMessage);
+  const setTyping = useChatStore((s) => s.setTyping);
+  const setPendingDiffs = useChatStore((s) => s.setPendingDiffs);
+  const setStreamMeta = useChatStore((s) => s.setStreamMeta);
+  const clearPending = useChatStore((s) => s.clearPending);
 
   const streamChat = async (input: StreamChatInput): Promise<void> => {
     setStreaming(true);
+    setTyping(true);
+    clearPending();
     upsertStreamingMessage("");
     try {
       const response = await fetch("/api/chat/stream", {
@@ -49,9 +56,27 @@ export function useChat() {
           const payload = event.replace("data:", "").trim();
           if (payload === "[DONE]") continue;
           try {
-            const parsed = JSON.parse(payload) as { text?: string };
+            const parsed = JSON.parse(payload) as {
+              text?: string;
+              meta?: {
+                creditsUsed?: number;
+                planMode?: boolean;
+                implementPrompt?: string | null;
+              };
+              diffs?: DiffBlock[];
+            };
             if (parsed.text) {
               upsertStreamingMessage(parsed.text);
+            }
+            if (parsed.meta) {
+              setStreamMeta({
+                creditsUsed: parsed.meta.creditsUsed ?? 0,
+                planMode: parsed.meta.planMode ?? false,
+                implementPrompt: parsed.meta.implementPrompt ?? null,
+              });
+            }
+            if (parsed.diffs) {
+              setPendingDiffs(parsed.diffs);
             }
           } catch {
             // Ignore malformed chunk and continue stream.
@@ -60,6 +85,7 @@ export function useChat() {
       }
       finishStreamingMessage();
     } finally {
+      setTyping(false);
       setStreaming(false);
     }
   };

@@ -13,6 +13,8 @@ type StudioStore = StudioPanelState & {
   setPreviewDevice: (device: StudioPanelState["previewDevice"]) => void;
   setPlanMode: (enabled: boolean) => void;
   enqueuePrompt: (item: QueueItem) => void;
+  setQueue: (items: QueueItem[]) => void;
+  removeQueueItem: (id: string) => void;
   dequeuePrompt: () => void;
   clearQueue: () => void;
 };
@@ -62,6 +64,14 @@ export const useStudioStore = create<StudioStore>()(
     enqueuePrompt: (item) =>
       set((state) => {
         state.queue.push(item);
+      }),
+    setQueue: (items) =>
+      set((state) => {
+        state.queue = items;
+      }),
+    removeQueueItem: (id) =>
+      set((state) => {
+        state.queue = state.queue.filter((item) => item.id !== id);
       }),
     dequeuePrompt: () =>
       set((state) => {

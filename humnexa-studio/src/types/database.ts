@@ -9,6 +9,23 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      plans: {
+        Row: {
+          id: string;
+          code: string;
+          name: string;
+          price_inr: number;
+          monthly_credits: number;
+          hard_cap: number;
+          daily_cap: number | null;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["plans"]["Row"], "id" | "created_at"> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["plans"]["Row"]>;
+      };
       profiles: {
         Row: {
           id: string;
@@ -18,6 +35,7 @@ export type Database = {
           plan_id: string | null;
           credits_balance: number;
           monthly_used: number;
+          onboarding_completed?: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -37,6 +55,8 @@ export type Database = {
           editor_font_family: string;
           onboarding_step: number;
           category_preference: string | null;
+          app_category?: string | null;
+          work_preference?: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -134,6 +154,7 @@ export type Database = {
           amount: number;
           type: "usage" | "purchase" | "refund" | "bonus";
           reason: string | null;
+          metadata?: Json;
           created_at: string;
         };
         Insert: Omit<Database["public"]["Tables"]["credit_transactions"]["Row"], "id" | "created_at"> & {
@@ -143,5 +164,9 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["credit_transactions"]["Row"]>;
       };
     };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+    Enums: Record<string, never>;
+    CompositeTypes: Record<string, never>;
   };
 };
