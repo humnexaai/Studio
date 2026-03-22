@@ -73,6 +73,7 @@ export type Database = {
           framework: string;
           status: string;
           github_url: string | null;
+          github_full_name?: string | null;
           deployed_url: string | null;
           created_at: string;
           updated_at: string;

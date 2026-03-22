@@ -9,6 +9,9 @@ type StudioNavbarProps = {
   credits: number;
   statusText?: string;
   onDeploy?: () => void;
+  onPush?: () => void;
+  pushLoading?: boolean;
+  pushedRepoUrl?: string | null;
   onProjectNameChange?: (value: string) => void;
   onToggleChat?: () => void;
   onTogglePreview?: () => void;
@@ -20,6 +23,9 @@ export function StudioNavbar({
   credits,
   statusText = "Ready to build",
   onDeploy,
+  onPush,
+  pushLoading = false,
+  pushedRepoUrl,
   onProjectNameChange,
   onToggleChat,
   onTogglePreview,
@@ -78,7 +84,25 @@ export function StudioNavbar({
           <Rocket className="h-4 w-4" />
           Deploy
         </button>
+        <button
+          type="button"
+          onClick={onPush}
+          disabled={pushLoading}
+          className="inline-flex items-center gap-1 rounded-lg border border-brand-border bg-brand-card px-3 py-1.5 text-sm font-semibold text-brand-text disabled:opacity-60"
+        >
+          {pushLoading ? "Pushing..." : "Push"}
+        </button>
       </div>
+      {pushedRepoUrl ? (
+        <a
+          href={pushedRepoUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="ml-2 max-w-[220px] truncate text-xs text-brand-gr underline"
+        >
+          {pushedRepoUrl}
+        </a>
+      ) : null}
     </header>
   );
 }

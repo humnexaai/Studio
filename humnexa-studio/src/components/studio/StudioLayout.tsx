@@ -63,6 +63,10 @@ export function StudioLayout({
   const [versionOpen, setVersionOpen] = useState(false);
   const [chatDragging, setChatDragging] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [pushLoading, setPushLoading] = useState(false);
+  const [pushedRepoUrl, setPushedRepoUrl] = useState<string | null>(null);
+  const [pushToast, setPushToast] = useState<string | null>(null);
+  const pushTimeoutRef = useRef<number | null>(null);
   const saveTimeoutRef = useRef<Record<string, number>>({});
   const {
     chatWidth,
@@ -268,11 +272,49 @@ export function StudioLayout({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
+  const pushToGitHub = async (): Promise<void> => {
+    try {
+      setPushLoading(true);
+      setPushToast(null);
+      const response = await fetch(`/api/projects/${projectId}/push`, {
+        method: "POST",
+      });
+      const payload = (await response.json()) as {
+        error?: string;
+        repoUrl?: string;
+      };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Push failed");
+      }
+      setPushedRepoUrl(payload.repoUrl ?? null);
+      setPushToast("✅ Pushed successfully");
+    } catch (error) {
+      setPushToast(
+        `❌ ${
+          error instanceof Error
+            ? error.message
+            : "Unable to push to GitHub"
+        }`,
+      );
+    } finally {
+      setPushLoading(false);
+      if (pushTimeoutRef.current) {
+        window.clearTimeout(pushTimeoutRef.current);
+      }
+      pushTimeoutRef.current = window.setTimeout(() => setPushToast(null), 3500);
+    }
+  };
+
   return (
     <div className="flex min-h-screen flex-col bg-brand-bg">
       <StudioNavbar
         projectName={projectName}
         credits={credits}
+        onPush={() => {
+          void pushToGitHub();
+        }}
+        pushLoading={pushLoading}
+        pushedRepoUrl={pushedRepoUrl}
         onProjectNameChange={setProjectName}
         onToggleChat={toggleChatCollapsed}
         onTogglePreview={togglePreviewCollapsed}
@@ -384,6 +426,14 @@ export function StudioLayout({
         ? createPortal(
             <div className="fixed bottom-3 right-3 z-50 rounded-md border border-brand-error bg-brand-card px-3 py-2 text-xs text-brand-error">
               Save failed: {saveError}
+            </div>,
+            document.body,
+          )
+        : null}
+      {pushToast && typeof document !== "undefined"
+        ? createPortal(
+            <div className="fixed bottom-16 right-3 z-50 rounded-md border border-brand-border bg-brand-card px-3 py-2 text-xs text-brand-text">
+              {pushToast}
             </div>,
             document.body,
           )
