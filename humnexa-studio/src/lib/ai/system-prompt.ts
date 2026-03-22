@@ -5,6 +5,7 @@ export function buildSystemPrompt(
   mode: StudioMode,
   projectName: string,
   framework: string,
+  options?: { hindiMode?: boolean },
 ): string {
   if (mode === "plan") {
     return [
@@ -24,6 +25,9 @@ export function buildSystemPrompt(
 
   return [
     "You are Humnexa AI — an expert full-stack developer.",
+    options?.hindiMode
+      ? "User preference: हिंदी मोड enabled. Keep guidance simple and include light Hindi where helpful."
+      : "User preference: English mode.",
     "",
     "PROJECT CONTEXT:",
     `- Project: ${projectName}`,

@@ -1,29 +1,73 @@
-import { HindiToggle } from "@/components/ui/HindiToggle";
+import { redirect } from "next/navigation";
+import SettingsClient from "./SettingsClient";
+import { createSupabaseServer } from "@/lib/supabase/server";
 
-export default function SettingsPage(): React.ReactElement {
+type SettingsRow = {
+  id: string;
+  theme: "dark" | "light" | "system";
+  hindi_mode: boolean;
+  editor_font_size: number;
+  editor_tab_size: number;
+  editor_font_family: string;
+  notifications_deploy: boolean;
+  notifications_credits: boolean;
+  notifications_team: boolean;
+};
+
+type OauthConnection = {
+  id: string;
+  provider: "github" | "google" | "vercel";
+  metadata: { user_name?: string; username?: string } | null;
+};
+
+const defaultSettings: SettingsRow = {
+  id: "",
+  theme: "dark",
+  hindi_mode: false,
+  editor_font_size: 14,
+  editor_tab_size: 2,
+  editor_font_family: "JetBrains Mono",
+  notifications_deploy: true,
+  notifications_credits: true,
+  notifications_team: true,
+};
+
+export default async function SettingsPage(): Promise<React.ReactElement> {
+  const supabase = createSupabaseServer();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    redirect("/auth");
+  }
+
+  const [{ data: settings }, { data: connections }] = await Promise.all([
+    supabase
+      .from("user_settings")
+      .select(
+        "id,theme,hindi_mode,editor_font_size,editor_tab_size,editor_font_family,notifications_deploy,notifications_credits,notifications_team",
+      )
+      .eq("id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("oauth_connections")
+      .select("id,provider,metadata")
+      .eq("user_id", user.id)
+      .in("provider", ["github", "google", "vercel"]),
+  ]);
+
+  const typedSettings = (settings as SettingsRow | null) ?? {
+    ...defaultSettings,
+    id: user.id,
+  };
+  const typedConnections = ((connections ?? []) as OauthConnection[]).filter((row) =>
+    ["github", "google", "vercel"].includes(row.provider),
+  );
+
   return (
-    <section className="space-y-6">
-      <h1 className="text-2xl font-semibold">Settings</h1>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-2xl border border-brand-border bg-brand-card p-5">
-          <h2 className="mb-2 font-medium">Appearance</h2>
-          <p className="text-sm text-brand-sub">Dark is default for Studio.</p>
-          <div className="mt-3 flex gap-2">
-            {["Dark", "Light", "System"].map((theme) => (
-              <button
-                key={theme}
-                className="rounded-lg border border-brand-border bg-brand-card2 px-3 py-1.5 text-sm text-brand-sub"
-              >
-                {theme}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="rounded-2xl border border-brand-border bg-brand-card p-5">
-          <h2 className="mb-2 font-medium">Language</h2>
-          <HindiToggle />
-        </div>
-      </div>
-    </section>
+    <SettingsClient
+      initialSettings={{ ...typedSettings, id: user.id }}
+      connections={typedConnections}
+    />
   );
 }

@@ -142,6 +142,14 @@ export async function POST(req: Request): Promise<Response> {
       updatedAt: file.updatedAt ?? new Date().toISOString(),
     }));
 
+    const { data: settings } = await supabase
+      .from("user_settings")
+      .select("hindi_mode")
+      .eq("id", user.id)
+      .maybeSingle();
+    const typedSettings = settings as { hindi_mode?: boolean } | null;
+    const hindiMode = typedSettings?.hindi_mode ?? false;
+
     const systemPrompt =
       planMode
         ? buildPlanModePrompt()
@@ -150,6 +158,7 @@ export async function POST(req: Request): Promise<Response> {
             "agent",
             `Project ${parsed.projectId.slice(0, 8)}`,
             "nextjs",
+            { hindiMode },
           );
 
     type HistoryMessage = { role: string; content: string };

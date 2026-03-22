@@ -55,6 +55,9 @@ export type Database = {
           editor_font_family: string;
           onboarding_step: number;
           category_preference: string | null;
+          notifications_deploy?: boolean;
+          notifications_credits?: boolean;
+          notifications_team?: boolean;
           app_category?: string | null;
           work_preference?: string | null;
           created_at: string;
@@ -215,6 +218,7 @@ export type Database = {
           body: string;
           type: string;
           read_at: string | null;
+          is_read?: boolean;
           created_at: string;
         };
         Insert: Omit<Database["public"]["Tables"]["notifications"]["Row"], "id" | "created_at"> & {
@@ -222,6 +226,28 @@ export type Database = {
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["notifications"]["Row"]>;
+      };
+      oauth_connections: {
+        Row: {
+          id: string;
+          user_id: string;
+          provider: "github" | "google" | "vercel";
+          access_token: string | null;
+          refresh_token: string | null;
+          expires_at: string | null;
+          metadata: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<
+          Database["public"]["Tables"]["oauth_connections"]["Row"],
+          "id" | "created_at" | "updated_at"
+        > & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["oauth_connections"]["Row"]>;
       };
     };
     Views: Record<string, never>;
