@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useChatStore } from "@/store/chatStore";
 import type { DiffBlock } from "@/types/studio";
 import { useUserStore } from "@/store/userStore";
-import { useUserStore } from "@/store/userStore";
 
 type StreamChatInput = {
   projectId: string;

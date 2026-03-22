@@ -781,6 +781,7 @@ export function StudioLayout({
           }
           if (parsed.type === "success") {
             setDeployLiveUrl(parsed.url);
+            setDeployedUrl(parsed.url);
             setDeployError(null);
             setDeployStatusText(parsed.message);
             setDeployLogs((prev) => [...prev, parsed.message]);

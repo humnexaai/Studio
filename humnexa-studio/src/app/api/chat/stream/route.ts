@@ -180,7 +180,7 @@ export async function POST(req: Request): Promise<Response> {
           })) ?? [];
     }
 
-    const { result } = await routeAI(
+    const { provider, result } = await routeAI(
       [...conversationHistory, { role: "user", content: parsed.message }],
       systemPrompt,
     );
@@ -236,7 +236,7 @@ export async function POST(req: Request): Promise<Response> {
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({
-                provider: result.provider,
+                provider,
               })}\n\n`,
             ),
           );

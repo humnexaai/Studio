@@ -41,10 +41,17 @@ export default async function StudioProjectPage({
   }
 
   const { data: project } = await db
-    .from<{ id: string; name: string; framework: string; status: string }>(
+    .from<{
+      id: string;
+      name: string;
+      framework: string;
+      status: string;
+      branch_name: string | null;
+      deployed_url: string | null;
+    }>(
       "projects",
     )
-    .select("id,name,framework,status")
+    .select("id,name,framework,status,branch_name,deployed_url")
     .eq("id", params.projectId)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -140,6 +147,10 @@ export default async function StudioProjectPage({
       <StudioLayout
         projectId={project.id}
         initialProjectName={project.name}
+        initialProjectMeta={{
+          branchName: project.branch_name ?? null,
+          deployedUrl: project.deployed_url ?? null,
+        }}
         initialFiles={initialFiles}
         initialConversationId={conversationId}
         projectFramework={project.framework}
