@@ -23,6 +23,23 @@ export type DiffBlock = {
   securitySensitive?: boolean;
 };
 
+export type SelectedElementContext = {
+  tagName: string;
+  className: string;
+  id: string;
+  textContent: string;
+  boundingClientRect: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    top: number;
+    left: number;
+    right: number;
+    bottom: number;
+  };
+};
+
 export type ChatMessage = {
   id: string;
   role: "user" | "assistant";
@@ -32,6 +49,7 @@ export type ChatMessage = {
   creditsUsed?: number;
   planMode?: boolean;
   implementPrompt?: string;
+  optimistic?: boolean;
 };
 
 export type QueueItem = {
@@ -42,7 +60,7 @@ export type QueueItem = {
   createdAt: string;
 };
 
-export type StudioTab = "chat" | "code";
+export type StudioTab = "chat" | "code" | "tests";
 
 export type StudioPanelState = {
   chatWidth: number;
@@ -53,6 +71,8 @@ export type StudioPanelState = {
   previewDevice: PreviewDevice;
   planMode: boolean;
   autoApply: boolean;
+  visualEditEnabled: boolean;
+  selectedElement: SelectedElementContext | null;
   queue: QueueItem[];
 };
 

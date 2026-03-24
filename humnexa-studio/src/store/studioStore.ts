@@ -2,7 +2,12 @@
 
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
-import type { QueueItem, StudioPanelState, StudioTab } from "@/types/studio";
+import type {
+  QueueItem,
+  SelectedElementContext,
+  StudioPanelState,
+  StudioTab,
+} from "@/types/studio";
 
 type StudioStore = StudioPanelState & {
   setChatWidth: (width: number) => void;
@@ -13,6 +18,8 @@ type StudioStore = StudioPanelState & {
   setPreviewDevice: (device: StudioPanelState["previewDevice"]) => void;
   setPlanMode: (enabled: boolean) => void;
   setAutoApply: (enabled: boolean) => void;
+  setVisualEditEnabled: (enabled: boolean) => void;
+  setSelectedElement: (selected: SelectedElementContext | null) => void;
   enqueuePrompt: (item: QueueItem) => void;
   setQueue: (items: QueueItem[]) => void;
   removeQueueItem: (id: string) => void;
@@ -29,6 +36,8 @@ const initialState: StudioPanelState = {
   previewDevice: "desktop",
   planMode: false,
   autoApply: false,
+  visualEditEnabled: false,
+  selectedElement: null,
   queue: [],
 };
 
@@ -66,6 +75,14 @@ export const useStudioStore = create<StudioStore>()(
     setAutoApply: (enabled) =>
       set((state) => {
         state.autoApply = enabled;
+      }),
+    setVisualEditEnabled: (enabled) =>
+      set((state) => {
+        state.visualEditEnabled = enabled;
+      }),
+    setSelectedElement: (selected) =>
+      set((state) => {
+        state.selectedElement = selected;
       }),
     enqueuePrompt: (item) =>
       set((state) => {

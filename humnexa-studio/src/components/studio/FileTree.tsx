@@ -4,12 +4,17 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ChevronRight,
   Copy,
+  FileCode,
+  FileJson2,
+  FileText,
   Edit3,
   File,
   Folder,
   FolderPlus,
+  Leaf,
   MoreHorizontal,
   Plus,
+  ReceiptText,
   Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -241,7 +246,7 @@ function TreeNode({
         )}
         style={{ paddingLeft: `${level * 12 + 8}px` }}
       >
-        <File className="h-4 w-4" />
+        {fileIconForPath(node.fullPath)}
         <span className="truncate font-code">{node.name}</span>
       </button>
     );
@@ -281,6 +286,46 @@ function TreeNode({
       ) : null}
     </div>
   );
+}
+
+function fileIconForPath(path: string): React.ReactNode {
+  const lower = path.toLowerCase();
+  if (lower.endsWith(".py")) {
+    return <span className="text-sm">🐍</span>;
+  }
+  if (lower.endsWith(".go")) {
+    return <span className="text-sm">🩵</span>;
+  }
+  if (lower.endsWith(".java")) {
+    return <span className="text-sm">☕</span>;
+  }
+  if (lower.endsWith(".dart")) {
+    return <span className="text-sm">🎯</span>;
+  }
+  if (lower.endsWith(".vue")) {
+    return <Leaf className="h-4 w-4 text-green-500" />;
+  }
+  if (lower.endsWith(".rs")) {
+    return <span className="text-sm">🦀</span>;
+  }
+  if (lower.endsWith(".json")) {
+    return <FileJson2 className="h-4 w-4 text-yellow-500" />;
+  }
+  if (lower.endsWith(".md")) {
+    return <FileText className="h-4 w-4 text-blue-300" />;
+  }
+  if (
+    lower.endsWith(".ts") ||
+    lower.endsWith(".tsx") ||
+    lower.endsWith(".js") ||
+    lower.endsWith(".jsx")
+  ) {
+    return <FileCode className="h-4 w-4 text-sky-400" />;
+  }
+  if (lower.endsWith(".sql")) {
+    return <ReceiptText className="h-4 w-4 text-purple-400" />;
+  }
+  return <File className="h-4 w-4" />;
 }
 
 function ContextAction({

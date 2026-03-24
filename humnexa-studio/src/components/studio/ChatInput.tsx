@@ -10,6 +10,7 @@ type ChatInputProps = {
   onSubmit: (value: string) => void;
   planMode: boolean;
   onPlanModeChange: (enabled: boolean) => void;
+  hindiMode?: boolean;
   disabled?: boolean;
 };
 
@@ -19,6 +20,7 @@ export function ChatInput({
   onSubmit,
   planMode,
   onPlanModeChange,
+  hindiMode = false,
   disabled = false,
 }: ChatInputProps): React.ReactElement {
   const [value, setValue] = useState("");
@@ -76,6 +78,11 @@ export function ChatInput({
             disabled={disabled}
             className="ml-auto inline-flex items-center gap-2 rounded-xl bg-brand-gradient px-4 py-2 text-sm font-semibold text-white"
           >
+            {hindiMode ? (
+              <span className="rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-bold">
+                हिंदी
+              </span>
+            ) : null}
             Send
             <Send className="h-4 w-4" />
           </button>

@@ -195,9 +195,13 @@ export type Database = {
           category: string;
           description: string;
           price_inr: number;
+          creator_id?: string | null;
+          source_project_id?: string | null;
+          tags?: string[] | null;
           metadata: Json;
           is_active?: boolean;
           downloads?: number;
+          rating?: number | null;
           is_india_specific?: boolean;
           framework?: string | null;
           created_at: string;

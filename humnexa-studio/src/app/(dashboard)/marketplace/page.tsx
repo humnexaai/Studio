@@ -15,6 +15,32 @@ type TemplateSeed = {
   downloads: number;
 };
 
+type MarketplaceTemplate = {
+  id: string;
+  name: string;
+  slug: string;
+  category: string;
+  description: string;
+  priceInr: number;
+  framework: string;
+  isActive: boolean;
+  downloads: number;
+  isIndiaSpecific: boolean;
+  rating: number;
+};
+
+type MyTemplate = {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  priceInr: number;
+  downloads: number;
+  rating: number;
+  isActive: boolean;
+  createdAt: string;
+};
+
 const TEMPLATE_SEED: TemplateSeed[] = [
   {
     slug: "food-delivery",
@@ -227,7 +253,7 @@ export default async function MarketplacePage(): Promise<React.ReactElement> {
     } | null;
   }>;
 
-  const templates = rows
+  const templates: MarketplaceTemplate[] = rows
     .map((row) => ({
       id: row.id,
       name: row.title,
@@ -239,9 +265,53 @@ export default async function MarketplacePage(): Promise<React.ReactElement> {
       isActive: row.is_active ?? row.metadata?.is_active ?? true,
       downloads: row.downloads ?? row.metadata?.downloads ?? 0,
       isIndiaSpecific: row.is_india_specific ?? row.metadata?.is_india_specific ?? false,
+      rating: 0,
     }))
     .filter((item) => item.isActive)
     .sort((a, b) => b.downloads - a.downloads);
 
-  return <MarketplaceClient templates={templates} />;
+  const myRowsResponse = await supabase
+    .from("templates")
+    .select(
+      "id,title,category,price_inr,is_active,downloads,rating,created_at,metadata,creator_id",
+    )
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  const myRows = (myRowsResponse.data ??
+    []) as Array<{
+    id: string;
+    title: string;
+    category: string;
+    price_inr: number;
+    is_active?: boolean;
+    downloads?: number;
+    rating?: number | null;
+    created_at: string;
+    creator_id?: string | null;
+    metadata?: {
+      creator_id?: string | null;
+      rating?: number | null;
+      description?: string | null;
+    } | null;
+  }>;
+
+  const myTemplates: MyTemplate[] = myRows
+    .filter((row) => {
+      const creatorId = row.creator_id ?? row.metadata?.creator_id ?? null;
+      return creatorId === user.id;
+    })
+    .map((row) => ({
+      id: row.id,
+      name: row.title,
+      category: row.category,
+      description: row.metadata?.description ?? "",
+      priceInr: row.price_inr,
+      downloads: row.downloads ?? 0,
+      rating: row.rating ?? row.metadata?.rating ?? 0,
+      isActive: row.is_active ?? false,
+      createdAt: row.created_at,
+    }));
+
+  return <MarketplaceClient templates={templates} myTemplates={myTemplates} />;
 }

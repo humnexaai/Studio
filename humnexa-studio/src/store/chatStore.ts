@@ -15,6 +15,7 @@ type ChatState = {
     implementPrompt: string | null;
   } | null;
   addMessage: (role: ChatMessage["role"], content: string) => void;
+  removeLastUserMessage: () => void;
   setMessages: (messages: ChatMessage[]) => void;
   setTyping: (typing: boolean) => void;
   upsertStreamingMessage: (chunk: string) => void;
@@ -47,6 +48,17 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         },
       ],
     })),
+  removeLastUserMessage: () =>
+    set((state) => {
+      for (let i = state.messages.length - 1; i >= 0; i -= 1) {
+        if (state.messages[i].role === "user") {
+          const next = [...state.messages];
+          next.splice(i, 1);
+          return { messages: next };
+        }
+      }
+      return { messages: state.messages };
+    }),
   setMessages: (messages) => set({ messages }),
   setTyping: (typing) => set({ typing }),
   upsertStreamingMessage: (chunk) => {

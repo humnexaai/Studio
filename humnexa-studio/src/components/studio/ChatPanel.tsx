@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { nanoid } from "nanoid";
 import { useChatStore } from "@/store/chatStore";
@@ -13,7 +13,7 @@ import { CreditConfirmModal } from "@/components/studio/CreditConfirmModal";
 import { useStudioStore } from "@/store/studioStore";
 import { useChat } from "@/hooks/useChat";
 import { estimateCredits } from "@/lib/credits/estimate";
-import type { ProjectFile, QueueItem } from "@/types/studio";
+import type { ProjectFile, QueueItem, SelectedElementContext } from "@/types/studio";
 import { useUserStore } from "@/store/userStore";
 
 type ChatPanelProps = {
@@ -23,6 +23,7 @@ type ChatPanelProps = {
   currentFiles: ProjectFile[];
   autoApply: boolean;
   onAutoApplyChange: (enabled: boolean) => void;
+  selectedElement: SelectedElementContext | null;
   onApplyFileChanges: (files: Array<{ path: string; content: string }>) => void;
   onRejectChanges: () => void;
 };
@@ -34,6 +35,7 @@ export function ChatPanel({
   currentFiles,
   autoApply,
   onAutoApplyChange,
+  selectedElement,
   onApplyFileChanges,
   onRejectChanges,
 }: ChatPanelProps): React.ReactElement {
@@ -53,6 +55,19 @@ export function ChatPanel({
   const [inputBlocked, setInputBlocked] = useState(false);
   const [keyWarning, setKeyWarning] = useState<string | null>(null);
   const [diffToast, setDiffToast] = useState<string | null>(null);
+  const [errorToast, setErrorToast] = useState<string | null>(null);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const [visibleRange, setVisibleRange] = useState({ start: 0, end: 20 });
+  const hindiMode = useUserStore((state) => state.hindiMode);
+
+  const selectedLabel = useMemo(() => {
+    if (!selectedElement) return null;
+    const tag = selectedElement.tagName || "element";
+    const cls = selectedElement.className
+      ? `.${selectedElement.className.split(" ").filter(Boolean).join(".")}`
+      : "";
+    return `${tag}${cls}`;
+  }, [selectedElement]);
 
   useEffect(() => {
     setInputBlocked(credits <= 0);
@@ -89,6 +104,30 @@ export function ChatPanel({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [streaming, queue.length]);
+
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    const compute = (): void => {
+      const rowHeight = 120;
+      const overscan = 5;
+      const viewportTop = container.scrollTop;
+      const viewportBottom = viewportTop + container.clientHeight;
+      const start = Math.max(0, Math.floor((viewportTop - 500) / rowHeight) - overscan);
+      const end = Math.min(
+        messages.length,
+        Math.ceil((viewportBottom + 500) / rowHeight) + overscan,
+      );
+      setVisibleRange({ start, end: Math.max(end, start + 1) });
+    };
+    compute();
+    container.addEventListener("scroll", compute);
+    window.addEventListener("resize", compute);
+    return () => {
+      container.removeEventListener("scroll", compute);
+      window.removeEventListener("resize", compute);
+    };
+  }, [messages.length]);
 
   const latestAssistantMessage = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -148,7 +187,12 @@ export function ChatPanel({
       enqueuePrompt(item);
       return;
     }
-    await runPrompt(value, mode);
+    try {
+      await runPrompt(value, mode);
+    } catch (error) {
+      setErrorToast(error instanceof Error ? error.message : "Failed to send message");
+      window.setTimeout(() => setErrorToast(null), 2600);
+    }
   };
 
   const applyDiffs = (diffs: Array<{ filePath: string; after: string }>): void => {
@@ -162,11 +206,34 @@ export function ChatPanel({
     window.setTimeout(() => setDiffToast(null), 2200);
   };
 
+  const visibleMessages = useMemo(
+    () => messages.slice(visibleRange.start, visibleRange.end),
+    [messages, visibleRange],
+  );
+
   return (
     <div className="flex h-full flex-col rounded-2xl border border-brand-border bg-brand-card">
-      <div className="flex-1 space-y-4 overflow-y-auto p-4">
+      <div ref={messagesContainerRef} className="flex-1 space-y-4 overflow-y-auto p-4">
+        {messages.length === 0 && !typing ? (
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, idx) => (
+              <div
+                // eslint-disable-next-line react/no-array-index-key
+                key={idx}
+                className="rounded-xl border border-brand-border bg-brand-card2 p-3"
+              >
+                <div className="h-4 w-2/3 animate-pulse rounded bg-brand-border/50" />
+                <div className="mt-2 h-4 w-full animate-pulse rounded bg-brand-border/40" />
+                <div className="mt-2 h-4 w-3/4 animate-pulse rounded bg-brand-border/30" />
+              </div>
+            ))}
+          </div>
+        ) : null}
         {queue.length > 0 ? <PromptQueue /> : null}
-        {messages.map((message) => (
+        {visibleRange.start > 0 ? (
+          <div style={{ height: `${visibleRange.start * 120}px` }} aria-hidden />
+        ) : null}
+        {visibleMessages.map((message) => (
           <div key={message.id} className="space-y-2">
             <ChatBubble
               message={message}
@@ -209,9 +276,20 @@ export function ChatPanel({
             ) : null}
           </div>
         ))}
+        {visibleRange.end < messages.length ? (
+          <div
+            style={{ height: `${(messages.length - visibleRange.end) * 120}px` }}
+            aria-hidden
+          />
+        ) : null}
         {typing || streaming ? <TypingIndicator /> : null}
       </div>
       <div className="border-t border-brand-border p-3">
+        {selectedLabel ? (
+          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-brand-or/40 bg-brand-or/10 px-2.5 py-1 text-[11px] text-brand-or">
+            Editing: {selectedLabel}
+          </div>
+        ) : null}
         <label className="mb-2 flex items-center gap-2 text-xs text-brand-sub">
           <input
             type="checkbox"
@@ -225,8 +303,12 @@ export function ChatPanel({
           onSubmit={(value) => void handleSubmit(value)}
           planMode={planMode}
           onPlanModeChange={setPlanMode}
+          hindiMode={hindiMode}
           disabled={inputBlocked}
         />
+        <div className="mt-2 text-[11px] text-brand-muted">
+          Tip: type @ to reference another project.
+        </div>
       </div>
       <CreditConfirmModal
         open={confirmModalOpen}
@@ -270,6 +352,11 @@ export function ChatPanel({
       {diffToast ? (
         <div className="border-t border-brand-border bg-brand-card2 px-4 py-3 text-sm text-brand-gr">
           {diffToast}
+        </div>
+      ) : null}
+      {errorToast ? (
+        <div className="border-t border-brand-border bg-brand-card2 px-4 py-3 text-sm text-brand-error">
+          {errorToast}
         </div>
       ) : null}
     </div>
