@@ -7,6 +7,7 @@ import {
   Coins,
   Home,
   GitBranch,
+  Pencil,
 } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
 import { cn } from "@/lib/utils";
@@ -25,6 +26,9 @@ type StudioNavbarProps = {
   onToggleChat?: () => void;
   onTogglePreview?: () => void;
   onToggleVersions?: () => void;
+  onPublishTemplate?: () => void;
+  visualEditEnabled?: boolean;
+  onToggleVisualEdit?: () => void;
 };
 
 export function StudioNavbar({
@@ -40,6 +44,9 @@ export function StudioNavbar({
   onToggleChat,
   onTogglePreview,
   onToggleVersions,
+  onPublishTemplate,
+  visualEditEnabled = false,
+  onToggleVisualEdit,
 }: StudioNavbarProps): React.ReactElement {
   return (
     <header className="flex h-[52px] items-center gap-3 border-b border-brand-border bg-brand-surf px-3">
@@ -82,10 +89,33 @@ export function StudioNavbar({
         </button>
         <button
           type="button"
+          onClick={onToggleVisualEdit}
+          className={cn(
+            "rounded-lg border px-2 py-1 text-xs transition",
+            visualEditEnabled
+              ? "border-brand-or bg-brand-or/20 text-brand-or"
+              : "border-brand-border bg-brand-card text-brand-sub hover:text-brand-text",
+          )}
+          title="Visual edit mode"
+        >
+          <span className="inline-flex items-center gap-1">
+            <Pencil className="h-3.5 w-3.5" />
+            Edit Mode
+          </span>
+        </button>
+        <button
+          type="button"
           onClick={onToggleVersions}
           className="rounded-lg border border-brand-border bg-brand-card px-2 py-1 text-xs text-brand-sub transition hover:text-brand-text"
         >
           Versions
+        </button>
+        <button
+          type="button"
+          onClick={onPublishTemplate}
+          className="rounded-lg border border-brand-border bg-brand-card px-2 py-1 text-xs text-brand-sub transition hover:text-brand-text"
+        >
+          Publish Template
         </button>
         <button
           type="button"

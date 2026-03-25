@@ -13,6 +13,21 @@ type PreviewPanelProps = {
   framework: string;
 };
 
+const PREVIEW_CHANNEL = "HUMNEXA_PREVIEW";
+const VISUAL_RUNTIME_FLAG = "__HUMNEXA_VISUAL_RUNTIME__";
+
+function supportsLivePreview(framework: string): boolean {
+  const normalized = framework.toLowerCase();
+  return normalized === "nextjs" || normalized === "react" || normalized === "vue";
+}
+
+function mapFrameworkToTemplate(framework: string): SandpackTemplate {
+  const normalized = framework.toLowerCase();
+  if (normalized === "react") return "create-react-app";
+  if (normalized === "vue") return "vue-cli";
+  return "nextjs";
+}
+
 function mapFilesToSandpack(files: ProjectFile[]): Record<string, { code: string }> {
   const mapped: Record<string, { code: string }> = {};
   for (const file of files) {
@@ -41,17 +56,122 @@ export function PreviewPanel({
 }: PreviewPanelProps): React.ReactElement {
   const device = useStudioStore((state) => state.previewDevice);
   const setDevice = useStudioStore((state) => state.setPreviewDevice);
+  const visualEditEnabled = useStudioStore((state) => state.visualEditEnabled);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const clientRef = useRef<SandpackClient | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
   const [ready, setReady] = useState(false);
+  const livePreview = supportsLivePreview(framework);
 
   const sandpackFiles = useMemo(() => mapFilesToSandpack(files), [files]);
 
+  const postVisualState = (enabled: boolean): void => {
+    iframeRef.current?.contentWindow?.postMessage(
+      {
+        channel: PREVIEW_CHANNEL,
+        type: "VISUAL_EDIT_TOGGLE",
+        enabled,
+      },
+      "*",
+    );
+  };
+
+  const injectVisualOverlayScript = (): void => {
+    const frameWindow = iframeRef.current?.contentWindow as
+      | (Window & { [VISUAL_RUNTIME_FLAG]?: boolean })
+      | null;
+    const frameDocument = iframeRef.current?.contentDocument;
+    if (!frameWindow || !frameDocument) return;
+    if (frameWindow[VISUAL_RUNTIME_FLAG]) return;
+    const script = frameDocument.createElement("script");
+    script.type = "text/javascript";
+    script.textContent = `
+      (function () {
+        if (window.${VISUAL_RUNTIME_FLAG}) return;
+        window.${VISUAL_RUNTIME_FLAG} = true;
+        var enabled = false;
+        var channel = "${PREVIEW_CHANNEL}";
+        var currentEl = null;
+        var prevOutline = "";
+        var prevCursor = "";
+
+        function isEditable(el) {
+          return el instanceof HTMLElement && el !== document.body && el !== document.documentElement;
+        }
+        function clearHover() {
+          if (!currentEl) return;
+          currentEl.style.outline = prevOutline;
+          currentEl.style.cursor = prevCursor;
+          currentEl = null;
+        }
+        function setHover(el) {
+          if (currentEl === el) return;
+          clearHover();
+          currentEl = el;
+          prevOutline = el.style.outline || "";
+          prevCursor = el.style.cursor || "";
+          el.style.outline = "2px solid #FF6B2C";
+          el.style.cursor = "crosshair";
+        }
+
+        document.addEventListener("mouseover", function (event) {
+          if (!enabled) return;
+          var el = event.target;
+          if (!isEditable(el)) return;
+          setHover(el);
+        }, true);
+
+        document.addEventListener("mouseout", function (event) {
+          if (!enabled) return;
+          if (event.target === currentEl) {
+            clearHover();
+          }
+        }, true);
+
+        document.addEventListener("click", function (event) {
+          if (!enabled) return;
+          var el = event.target;
+          if (!isEditable(el)) return;
+          event.preventDefault();
+          event.stopPropagation();
+          event.stopImmediatePropagation();
+          var rect = el.getBoundingClientRect();
+          window.parent.postMessage({
+            channel: channel,
+            type: "ELEMENT_SELECTED",
+            payload: {
+              tagName: (el.tagName || "").toLowerCase(),
+              className: (el.className || ""),
+              id: (el.id || ""),
+              textContent: (el.textContent || "").trim().slice(0, 50),
+              boundingClientRect: {
+                x: rect.x, y: rect.y, width: rect.width, height: rect.height,
+                top: rect.top, left: rect.left, right: rect.right, bottom: rect.bottom
+              }
+            }
+          }, "*");
+        }, true);
+
+        window.addEventListener("message", function (event) {
+          var data = event.data || {};
+          if (!data || data.channel !== channel) return;
+          if (data.type === "VISUAL_EDIT_TOGGLE") {
+            enabled = !!data.enabled;
+            if (!enabled) clearHover();
+          }
+          if (data.type === "VISUAL_EDIT_CLEAR") {
+            clearHover();
+          }
+        });
+      })();
+    `;
+    frameDocument.head.appendChild(script);
+    frameWindow[VISUAL_RUNTIME_FLAG] = true;
+  };
+
   useEffect(() => {
-    if (!iframeRef.current) return;
-    const template: SandpackTemplate =
-      framework.toLowerCase() === "react" ? "create-react-app" : "nextjs";
+    if (!livePreview || !iframeRef.current) return;
+    const template = mapFrameworkToTemplate(framework);
     void loadSandpackClient(
       iframeRef.current,
       {
@@ -66,13 +186,17 @@ export function PreviewPanel({
       clientRef.current = client;
       setReady(false);
       const unsubscribe = client.listen((msg) => {
-          if (
-            msg.type === "status" &&
-            (msg as unknown as { status?: string }).status === "done"
-          ) {
+        if (
+          msg.type === "status" &&
+          (msg as unknown as { status?: string }).status === "done"
+        ) {
           setReady(true);
         }
       });
+      window.setTimeout(() => {
+        injectVisualOverlayScript();
+        postVisualState(visualEditEnabled);
+      }, 500);
       cleanupRef.current = () => {
         unsubscribe();
         client.destroy();
@@ -83,7 +207,21 @@ export function PreviewPanel({
       cleanupRef.current?.();
       cleanupRef.current = null;
     };
-  }, [framework, sandpackFiles]);
+  }, [framework, sandpackFiles, livePreview, visualEditEnabled]);
+
+  useEffect(() => {
+    if (!livePreview || !ready) return;
+    injectVisualOverlayScript();
+    postVisualState(visualEditEnabled);
+    const frame = iframeRef.current;
+    if (!frame) return;
+    const onLoad = (): void => {
+      injectVisualOverlayScript();
+      postVisualState(visualEditEnabled);
+    };
+    frame.addEventListener("load", onLoad);
+    return () => frame.removeEventListener("load", onLoad);
+  }, [ready, livePreview, visualEditEnabled]);
 
   const widthClass =
     device === "mobile"
@@ -148,20 +286,31 @@ export function PreviewPanel({
         </div>
       </div>
       <div className="relative flex flex-1 items-start justify-center overflow-auto p-3">
-        {!ready ? (
+        {livePreview && !ready ? (
           <div className="absolute inset-3 animate-pulse rounded-xl border border-brand-border bg-brand-card2" />
         ) : null}
-        <iframe
-          ref={iframeRef}
-          title="Preview"
-          className={cn(
-            "h-full rounded-xl border border-brand-border bg-white transition-all",
-            widthClass,
-          )}
-        />
+        {livePreview ? (
+          <iframe
+            ref={iframeRef}
+            title="Preview"
+            className={cn(
+              "h-full rounded-xl border border-brand-border bg-white transition-all",
+              widthClass,
+            )}
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center rounded-xl border border-brand-border bg-brand-card2 p-6 text-center text-sm text-brand-sub">
+            Live preview not available for this framework. Server-side preview coming in
+            Phase 3.
+          </div>
+        )}
       </div>
       <div className="border-t border-brand-border px-3 py-2 text-xs text-brand-sub">
-        {ready ? "● Preview ready" : "● Building preview..."}
+        {livePreview
+          ? ready
+            ? `● Preview ready · Edit ${visualEditEnabled ? "on" : "off"}`
+            : "● Building preview..."
+          : `● ${framework} editor mode`}
       </div>
     </aside>
   );

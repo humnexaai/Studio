@@ -14,6 +14,17 @@ type MarketplaceTemplate = {
   isActive: boolean;
   downloads: number;
   isIndiaSpecific: boolean;
+  rating: number;
+};
+
+type MyTemplate = {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  downloads: number;
+  rating: number;
+  isActive: boolean;
 };
 
 const categories = [
@@ -28,8 +39,10 @@ const categories = [
 
 export default function MarketplaceClient({
   templates,
+  myTemplates,
 }: {
   templates: MarketplaceTemplate[];
+  myTemplates: MyTemplate[];
 }): React.ReactElement {
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -165,6 +178,49 @@ export default function MarketplaceClient({
           ))}
         </div>
       )}
+
+      <section className="space-y-3">
+        <h2 className="text-xl font-semibold">My Templates</h2>
+        {myTemplates.length === 0 ? (
+          <div className="rounded-2xl border border-brand-border bg-brand-card p-4 text-sm text-brand-sub">
+            You have not published any templates yet.
+          </div>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2">
+            {myTemplates.map((template) => (
+              <article
+                key={template.id}
+                className="rounded-2xl border border-brand-border bg-brand-card p-4"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="font-semibold">{template.name}</h3>
+                  <span
+                    className={`rounded-full border px-2 py-0.5 text-[11px] ${
+                      template.isActive
+                        ? "border-brand-gr/50 bg-brand-gr/10 text-brand-gr"
+                        : "border-brand-border bg-brand-card2 text-brand-sub"
+                    }`}
+                  >
+                    {template.isActive ? "Active" : "Pending review"}
+                  </span>
+                </div>
+                <p className="mt-1 text-sm text-brand-sub">{template.description}</p>
+                <div className="mt-3 flex items-center gap-2 text-xs text-brand-muted">
+                  <span className="rounded bg-brand-card2 px-2 py-1">
+                    {template.category}
+                  </span>
+                  <span className="rounded bg-brand-card2 px-2 py-1">
+                    {template.downloads.toLocaleString("en-IN")} downloads
+                  </span>
+                  <span className="rounded bg-brand-card2 px-2 py-1">
+                    {template.rating.toFixed(1)} rating
+                  </span>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
     </section>
   );
 }

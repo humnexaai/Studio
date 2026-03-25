@@ -21,6 +21,7 @@ export function useChat() {
   const setPendingDiffs = useChatStore((s) => s.setPendingDiffs);
   const setStreamMeta = useChatStore((s) => s.setStreamMeta);
   const clearPending = useChatStore((s) => s.clearPending);
+  const removeLastUserMessage = useChatStore((s) => s.removeLastUserMessage);
   const setLastModel = useUserStore((s) => s.setLastModel);
 
   const streamChat = async (input: StreamChatInput): Promise<void> => {
@@ -38,6 +39,7 @@ export function useChat() {
       });
 
       if (!response.ok || !response.body) {
+        removeLastUserMessage();
         throw new Error("Unable to stream response");
       }
 
@@ -92,6 +94,9 @@ export function useChat() {
         }
       }
       finishStreamingMessage();
+    } catch (error) {
+      removeLastUserMessage();
+      throw error;
     } finally {
       setTyping(false);
       setStreaming(false);

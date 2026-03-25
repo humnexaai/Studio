@@ -12,6 +12,7 @@ import { ResizeDivider } from "@/components/studio/ResizeDivider";
 import { VersionHistory } from "@/components/studio/VersionHistory";
 import { StatusBar } from "@/components/studio/StatusBar";
 import { DeployModal } from "@/components/deploy/DeployModal";
+import { PanelErrorBoundary } from "@/components/ui/PanelErrorBoundary";
 import { useStudioStore } from "@/store/studioStore";
 import { useUserStore } from "@/store/userStore";
 import { supabase } from "@/lib/supabase/client";
@@ -64,7 +65,20 @@ type NotificationEventRow = {
   body: string;
   type: string;
   created_at: string;
+  metadata?: {
+    project_name?: string;
+    deployed_url?: string;
+  } | null;
 };
+
+type TemplateCategory =
+  | "ecommerce"
+  | "education"
+  | "portfolio"
+  | "business"
+  | "mobile"
+  | "india"
+  | "other";
 
 type StudioLayoutProps = {
   projectId: string;
@@ -144,6 +158,14 @@ export function StudioLayout({
   } | null>(null);
   const [monacoErrorCount, setMonacoErrorCount] = useState(0);
   const [supabaseConnected, setSupabaseConnected] = useState(true);
+  const [templateModalOpen, setTemplateModalOpen] = useState(false);
+  const [templateSubmitting, setTemplateSubmitting] = useState(false);
+  const [templateName, setTemplateName] = useState(`${initialProjectName} Template`);
+  const [templateDescription, setTemplateDescription] = useState("");
+  const [templateCategory, setTemplateCategory] = useState<TemplateCategory>("business");
+  const [templatePriceInr, setTemplatePriceInr] = useState(0);
+  const [templateTagsInput, setTemplateTagsInput] = useState("");
+  const [templateIndiaSpecific, setTemplateIndiaSpecific] = useState(true);
   const desktopNotifiedRef = useRef<string[]>([]);
   const pushTimeoutRef = useRef<number | null>(null);
   const saveTimeoutRef = useRef<Record<string, number>>({});
@@ -690,6 +712,52 @@ export function StudioLayout({
     pushTimeoutRef.current = window.setTimeout(() => setPushToast(null), 3500);
   };
 
+  const publishAsTemplate = async (): Promise<void> => {
+    if (!templateName.trim()) {
+      setToastTone("error");
+      setPushToast("Template name is required.");
+      return;
+    }
+    try {
+      setTemplateSubmitting(true);
+      const response = await fetch(`/api/projects/${projectId}/publish-template`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: templateName.trim(),
+          description: templateDescription.trim(),
+          category: templateCategory,
+          price_inr: Math.max(0, Number(templatePriceInr) || 0),
+          tags: templateTagsInput
+            .split(",")
+            .map((part) => part.trim())
+            .filter(Boolean),
+          is_india_specific: templateIndiaSpecific,
+        }),
+      });
+      const payload = (await response.json()) as { error?: string; success?: boolean };
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error ?? "Failed to publish template");
+      }
+      setTemplateModalOpen(false);
+      setToastTone("success");
+      setPushToast(
+        "Template submitted for review. It will appear in marketplace within 24 hours.",
+      );
+      if (pushTimeoutRef.current) {
+        window.clearTimeout(pushTimeoutRef.current);
+      }
+      pushTimeoutRef.current = window.setTimeout(() => setPushToast(null), 4200);
+    } catch (error) {
+      setToastTone("error");
+      setPushToast(error instanceof Error ? error.message : "Template publish failed");
+    } finally {
+      setTemplateSubmitting(false);
+    }
+  };
+
   const startDeploy = async (): Promise<void> => {
     try {
       if (
@@ -833,7 +901,17 @@ export function StudioLayout({
         onToggleChat={toggleChatCollapsed}
         onTogglePreview={togglePreviewCollapsed}
         onToggleVersions={() => setVersionOpen((v) => !v)}
+        onPublishTemplate={() => setTemplateModalOpen(true)}
       />
+      <div className="border-b border-brand-border bg-brand-surf px-3 py-2">
+        <button
+          type="button"
+          onClick={() => setTemplateModalOpen(true)}
+          className="rounded-lg border border-brand-border bg-brand-card px-3 py-1.5 text-xs text-brand-sub hover:text-brand-text"
+        >
+          Publish as Template
+        </button>
+      </div>
       <div className="relative flex flex-1 overflow-hidden">
         {versionOpen ? (
           <VersionHistory
@@ -845,24 +923,26 @@ export function StudioLayout({
         ) : null}
 
         <aside className="w-[210px] border-r border-brand-border">
-          <FileTree
-            files={filePaths}
-            activeFile={activeFilePath}
-            onSelect={handleSelectFile}
-            onCreateFile={(path) => {
-              void createFileAtPath(path);
-            }}
-            onCreateFolder={createFolderAtPath}
-            onRenameFile={(oldPath, newPath) => {
-              void renameFilePath(oldPath, newPath);
-            }}
-            onDeleteFile={(path) => {
-              void deleteFilePath(path);
-            }}
-            onDuplicateFile={(path) => {
-              void duplicateFilePath(path);
-            }}
-          />
+          <PanelErrorBoundary panelName="FileTree">
+            <FileTree
+              files={filePaths}
+              activeFile={activeFilePath}
+              onSelect={handleSelectFile}
+              onCreateFile={(path) => {
+                void createFileAtPath(path);
+              }}
+              onCreateFolder={createFolderAtPath}
+              onRenameFile={(oldPath, newPath) => {
+                void renameFilePath(oldPath, newPath);
+              }}
+              onDeleteFile={(path) => {
+                void deleteFilePath(path);
+              }}
+              onDuplicateFile={(path) => {
+                void duplicateFilePath(path);
+              }}
+            />
+          </PanelErrorBoundary>
         </aside>
 
         <section className="flex min-w-0 flex-1">
@@ -879,36 +959,39 @@ export function StudioLayout({
                 💬 Chat
               </button>
             ) : (
-              <ChatPanel
-                projectId={projectId}
-                conversationId={initialConversationId}
-                initialMessages={initialMessages}
-                currentFiles={files}
-                autoApply={autoApply}
-                onAutoApplyChange={setAutoApply}
-                onApplyFileChanges={(changedFiles) => {
-                  void syncDiffsToDatabase(changedFiles);
-                  setFiles((prev) => {
-                    const map = new Map(prev.map((f) => [f.path, f]));
-                    for (const changed of changedFiles) {
-                      const existing = map.get(changed.path);
-                      map.set(changed.path, {
-                        id: existing?.id ?? `new-${changed.path}`,
-                        path: changed.path,
-                        content: changed.content,
-                        language: detectLanguageFromPath(changed.path),
-                        updatedAt: new Date().toISOString(),
-                      });
+              <PanelErrorBoundary panelName="ChatPanel">
+                <ChatPanel
+                  projectId={projectId}
+                  conversationId={initialConversationId}
+                  initialMessages={initialMessages}
+                  currentFiles={files}
+                  autoApply={autoApply}
+                  onAutoApplyChange={setAutoApply}
+                  selectedElement={null}
+                  onApplyFileChanges={(changedFiles) => {
+                    void syncDiffsToDatabase(changedFiles);
+                    setFiles((prev) => {
+                      const map = new Map(prev.map((f) => [f.path, f]));
+                      for (const changed of changedFiles) {
+                        const existing = map.get(changed.path);
+                        map.set(changed.path, {
+                          id: existing?.id ?? `new-${changed.path}`,
+                          path: changed.path,
+                          content: changed.content,
+                          language: detectLanguageFromPath(changed.path),
+                          updatedAt: new Date().toISOString(),
+                        });
+                      }
+                      return Array.from(map.values());
+                    });
+                  }}
+                  onRejectChanges={() => {
+                    if (versions[0]) {
+                      void restoreVersion(versions[0].id);
                     }
-                    return Array.from(map.values());
-                  });
-                }}
-                onRejectChanges={() => {
-                  if (versions[0]) {
-                    void restoreVersion(versions[0].id);
-                  }
-                }}
-              />
+                  }}
+                />
+              </PanelErrorBoundary>
             )}
           </div>
 
@@ -918,13 +1001,15 @@ export function StudioLayout({
 
           <div className="min-w-[320px] flex-1">
             {activeFile ? (
-              <CodePanel
-                path={activeFile.path}
-                content={activeFile.content}
-                language={activeFile.language}
-                onChange={handleCodeChange}
-                onErrorCountChange={setMonacoErrorCount}
-              />
+              <PanelErrorBoundary panelName="CodePanel">
+                <CodePanel
+                  path={activeFile.path}
+                  content={activeFile.content}
+                  language={activeFile.language}
+                  onChange={handleCodeChange}
+                  onErrorCountChange={setMonacoErrorCount}
+                />
+              </PanelErrorBoundary>
             ) : (
               <div className="flex h-full items-center justify-center rounded-2xl border border-brand-border bg-brand-card text-brand-sub">
                 Select a file to start editing
@@ -948,7 +1033,9 @@ export function StudioLayout({
               👁 Preview
             </button>
           ) : (
-            <PreviewPanel files={files} framework={projectFramework} />
+            <PanelErrorBoundary panelName="PreviewPanel">
+              <PreviewPanel files={files} framework={projectFramework} />
+            </PanelErrorBoundary>
           )}
         </aside>
       </div>
@@ -1000,6 +1087,87 @@ export function StudioLayout({
           if (!deployLoading) setDeployOpen(false);
         }}
       />
+      {templateModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-lg rounded-2xl border border-brand-border bg-brand-card p-5">
+            <h3 className="text-lg font-semibold">Publish as Template</h3>
+            <div className="mt-4 grid gap-3">
+              <input
+                value={templateName}
+                onChange={(event) => setTemplateName(event.target.value)}
+                placeholder="Template name"
+                className="w-full rounded-xl border border-brand-border bg-brand-card2 px-3 py-2 text-sm outline-none"
+              />
+              <textarea
+                value={templateDescription}
+                onChange={(event) => setTemplateDescription(event.target.value)}
+                placeholder="Describe what this template includes"
+                rows={3}
+                className="w-full rounded-xl border border-brand-border bg-brand-card2 px-3 py-2 text-sm outline-none"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <select
+                  value={templateCategory}
+                  onChange={(event) => setTemplateCategory(event.target.value as TemplateCategory)}
+                  className="rounded-xl border border-brand-border bg-brand-card2 px-3 py-2 text-sm outline-none"
+                >
+                  <option value="ecommerce">E-Commerce</option>
+                  <option value="education">Education</option>
+                  <option value="portfolio">Portfolio</option>
+                  <option value="business">Business</option>
+                  <option value="mobile">Mobile</option>
+                  <option value="india">India</option>
+                  <option value="other">Other</option>
+                </select>
+                <input
+                  type="number"
+                  min={0}
+                  value={templatePriceInr}
+                  onChange={(event) =>
+                    setTemplatePriceInr(Math.max(0, Number(event.target.value) || 0))
+                  }
+                  placeholder="Price in INR"
+                  className="rounded-xl border border-brand-border bg-brand-card2 px-3 py-2 text-sm outline-none"
+                />
+              </div>
+              <input
+                value={templateTagsInput}
+                onChange={(event) => setTemplateTagsInput(event.target.value)}
+                placeholder="Tags (comma separated)"
+                className="w-full rounded-xl border border-brand-border bg-brand-card2 px-3 py-2 text-sm outline-none"
+              />
+              <label className="inline-flex items-center gap-2 text-sm text-brand-sub">
+                <input
+                  type="checkbox"
+                  checked={templateIndiaSpecific}
+                  onChange={(event) => setTemplateIndiaSpecific(event.target.checked)}
+                  className="accent-brand-or"
+                />
+                India-specific template
+              </label>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setTemplateModalOpen(false)}
+                className="rounded-lg border border-brand-border px-3 py-2 text-sm text-brand-sub"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void publishAsTemplate();
+                }}
+                disabled={templateSubmitting}
+                className="rounded-lg bg-brand-gradient px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {templateSubmitting ? "Submitting..." : "Submit for Review"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
