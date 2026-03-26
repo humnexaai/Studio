@@ -21,13 +21,14 @@ interface PageImage {
   dataUrl: string;
   width: number;
   height: number;
+  format: ImageFormat;
 }
 
 async function getPdfJs() {
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-    pdfjs.GlobalWorkerOptions.workerSrc =
-      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.5.207/pdf.worker.min.mjs";
+    const version = pdfjs.version ?? "5.5.207";
+    pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${version}/pdf.worker.min.mjs`;
   }
   return pdfjs;
 }
@@ -88,6 +89,7 @@ export default function PdfToImagePage(): React.ReactElement {
             dataUrl,
             width: viewport.width,
             height: viewport.height,
+            format,
           });
 
           setProgress(Math.round((i / numPages) * 100));
@@ -128,14 +130,14 @@ export default function PdfToImagePage(): React.ReactElement {
     (img: PageImage) => {
       const link = document.createElement("a");
       link.href = img.dataUrl;
-      const ext = format;
+      const ext = img.format;
       const baseName = pdfFile
         ? pdfFile.name.replace(/\.pdf$/i, "")
         : "page";
       link.download = `${baseName}_page_${img.pageNum}.${ext}`;
       link.click();
     },
-    [format, pdfFile]
+    [pdfFile]
   );
 
   const downloadSelected = useCallback(() => {

@@ -136,6 +136,8 @@ export default function ImageToPdfPage(): React.ReactElement {
         canvas.width = imgW;
         canvas.height = imgH;
         const ctx = canvas.getContext("2d")!;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.save();
         ctx.translate(canvas.width / 2, canvas.height / 2);
         ctx.rotate((item.rotation * Math.PI) / 180);
