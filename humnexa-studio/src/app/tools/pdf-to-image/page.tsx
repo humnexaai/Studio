@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef } from "react";
 import {
   FileUp,
   Download,
@@ -23,6 +23,15 @@ interface PageImage {
   height: number;
 }
 
+async function getPdfJs() {
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  if (!pdfjs.GlobalWorkerOptions.workerSrc) {
+    pdfjs.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.5.207/pdf.worker.min.mjs";
+  }
+  return pdfjs;
+}
+
 export default function PdfToImagePage(): React.ReactElement {
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [pageImages, setPageImages] = useState<PageImage[]>([]);
@@ -33,19 +42,6 @@ export default function PdfToImagePage(): React.ReactElement {
   const [scale, setScale] = useState<ScaleOption>("2");
   const [selectedPages, setSelectedPages] = useState<Set<number>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const pdfjsLibRef = useRef<typeof import("pdfjs-dist") | null>(null);
-
-  useEffect(() => {
-    async function loadPdfJs() {
-      const pdfjs = await import("pdfjs-dist");
-      pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-        "pdfjs-dist/build/pdf.worker.min.mjs",
-        import.meta.url
-      ).toString();
-      pdfjsLibRef.current = pdfjs;
-    }
-    loadPdfJs();
-  }, []);
 
   const handleFileSelect = useCallback(
     async (file: File | null) => {
@@ -57,8 +53,7 @@ export default function PdfToImagePage(): React.ReactElement {
       setProgress(0);
 
       try {
-        const pdfjs = pdfjsLibRef.current;
-        if (!pdfjs) return;
+        const pdfjs = await getPdfJs();
 
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
