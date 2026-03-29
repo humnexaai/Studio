@@ -14,6 +14,9 @@ import {
 } from "@/lib/vercel/deploy";
 import { scanProjectFiles } from "@/lib/security/scan";
 import type { ProjectFile } from "@/types/studio";
+import { captureServerEvent } from "@/lib/analytics/posthog-server";
+
+export const preferredRegion = "bom1";
 
 type DeployEvent =
   | {
@@ -354,6 +357,12 @@ export async function POST(
                 title: "Deploy successful",
                 body: `Project ${project.name} is live at ${deployedUrl}`,
                 type: "deploy_success",
+              });
+              await captureServerEvent("project_deployed", {
+                userId: user.id,
+                framework: (projectFiles[0]?.path?.split(".").pop() ?? "unknown").toLowerCase(),
+                project_id: project.id,
+                deployed_url: deployedUrl,
               });
               writeEvent(controller, {
                 type: "success",

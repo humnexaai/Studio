@@ -11,6 +11,7 @@ import type { ProjectFile } from "@/types/studio";
 type PreviewPanelProps = {
   files: ProjectFile[];
   framework: string;
+  lowBandwidthMode?: boolean;
   onBuildApk?: () => void;
 };
 
@@ -62,6 +63,7 @@ function mapFilesToSandpack(files: ProjectFile[]): Record<string, { code: string
 export function PreviewPanel({
   files,
   framework,
+  lowBandwidthMode = false,
   onBuildApk,
 }: PreviewPanelProps): React.ReactElement {
   const device = useStudioStore((state) => state.previewDevice);
@@ -182,6 +184,7 @@ export function PreviewPanel({
   };
 
   useEffect(() => {
+    if (lowBandwidthMode) return;
     if (!livePreview || !iframeRef.current) return;
     const template = mapFrameworkToTemplate(framework);
     void loadSandpackClient(
@@ -219,9 +222,10 @@ export function PreviewPanel({
       cleanupRef.current?.();
       cleanupRef.current = null;
     };
-  }, [framework, sandpackFiles, livePreview, visualEditEnabled]);
+  }, [framework, sandpackFiles, livePreview, visualEditEnabled, lowBandwidthMode]);
 
   useEffect(() => {
+    if (lowBandwidthMode) return;
     if (!livePreview || !ready) return;
     injectVisualOverlayScript();
     postVisualState(visualEditEnabled);
@@ -233,7 +237,7 @@ export function PreviewPanel({
     };
     frame.addEventListener("load", onLoad);
     return () => frame.removeEventListener("load", onLoad);
-  }, [ready, livePreview, visualEditEnabled]);
+  }, [ready, livePreview, visualEditEnabled, lowBandwidthMode]);
 
   const widthClass =
     device === "mobile"
@@ -301,7 +305,7 @@ export function PreviewPanel({
         {livePreview && !ready ? (
           <div className="absolute inset-3 animate-pulse rounded-xl border border-brand-border bg-brand-card2" />
         ) : null}
-        {livePreview ? (
+        {livePreview && !lowBandwidthMode ? (
           <iframe
             ref={iframeRef}
             title="Preview"
@@ -310,6 +314,10 @@ export function PreviewPanel({
               widthClass,
             )}
           />
+        ) : livePreview && lowBandwidthMode ? (
+          <div className="flex h-full w-full items-center justify-center rounded-xl border border-brand-border bg-brand-card2 p-6 text-center text-sm text-brand-sub">
+            Low-bandwidth mode is enabled. Live preview is simplified to reduce network usage.
+          </div>
         ) : reactNativePreview ? (
           <div className="flex h-full w-full flex-col items-center justify-center gap-4 rounded-xl border border-brand-border bg-brand-card2 p-6 text-center">
             <div className="relative mx-auto h-[360px] w-[190px] rounded-[2.5rem] border-4 border-brand-border bg-brand-bg p-3 shadow-2xl">
@@ -352,7 +360,9 @@ export function PreviewPanel({
       <div className="border-t border-brand-border px-3 py-2 text-xs text-brand-sub">
         {livePreview
           ? ready
-            ? `● Preview ready · Edit ${visualEditEnabled ? "on" : "off"}`
+            ? lowBandwidthMode
+              ? "● Low-bandwidth simplified preview"
+              : `● Preview ready · Edit ${visualEditEnabled ? "on" : "off"}`
             : "● Building preview..."
           : reactNativePreview
             ? "● React Native preview mock"

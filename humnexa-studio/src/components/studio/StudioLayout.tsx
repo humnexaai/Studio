@@ -110,6 +110,7 @@ type StudioLayoutProps = {
   initialProjectInstructions?: string | null;
   initialCustomDomain?: string | null;
   initialIsPublic?: boolean;
+  initialLowBandwidthMode?: boolean;
   initialMessages: Array<{
     id: string;
     role: "user" | "assistant";
@@ -143,6 +144,7 @@ export function StudioLayout({
   initialProjectInstructions,
   initialCustomDomain,
   initialIsPublic,
+  initialLowBandwidthMode,
   initialMessages,
   initialVersions,
 }: StudioLayoutProps): React.ReactElement {
@@ -203,6 +205,7 @@ export function StudioLayout({
   const [domainModalOpen, setDomainModalOpen] = useState(false);
   const [domainVerifying, setDomainVerifying] = useState(false);
   const [publicProject, setPublicProject] = useState(Boolean(initialIsPublic));
+  const [lowBandwidthMode] = useState(Boolean(initialLowBandwidthMode));
   const [savingProjectSettings, setSavingProjectSettings] = useState(false);
   const [collaborators, setCollaborators] = useState<
     Array<{ userId: string; name: string; avatarUrl: string | null; activeFile?: string | null }>
@@ -279,10 +282,59 @@ export function StudioLayout({
         useUserStore.getState().setUser({
           userId: id,
           name: data.user?.user_metadata?.full_name ?? "Builder",
+          email: data.user?.email ?? null,
         });
       }
     });
   }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    void supabase
+      .from("profiles")
+      .select("credits_balance,plan_id,email,full_name")
+      .eq("id", userId)
+      .maybeSingle()
+      .then(async ({ data }) => {
+        const profile = data as
+          | {
+              credits_balance?: number | null;
+              plan_id?: string | null;
+              email?: string | null;
+              full_name?: string | null;
+            }
+          | null;
+
+        if (!profile) return;
+
+        useUserStore.getState().setCredits(profile.credits_balance ?? 0);
+        if (profile.full_name || profile.email) {
+          useUserStore.getState().setUser({
+            userId,
+            name: profile.full_name ?? userName ?? "Builder",
+            email: profile.email ?? null,
+          });
+        }
+
+        if (profile.plan_id) {
+          const { data: planRow } = await supabase
+            .from("plans")
+            .select("code")
+            .eq("id", profile.plan_id)
+            .maybeSingle();
+          const planCode = (planRow as { code?: string | null } | null)?.code;
+          if (
+            planCode === "free" ||
+            planCode === "starter" ||
+            planCode === "pro" ||
+            planCode === "business" ||
+            planCode === "student"
+          ) {
+            useUserStore.getState().setPlanCode(planCode);
+          }
+        }
+      });
+  }, [userId, userName]);
 
   useEffect(() => {
     if (!userId || typeof window === "undefined" || !("Notification" in window)) return;
@@ -338,7 +390,10 @@ export function StudioLayout({
   }, [projectId]);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || lowBandwidthMode) {
+      setCollaborators([]);
+      return;
+    }
     const presence = createProjectPresence(
       projectId,
       {
@@ -364,14 +419,14 @@ export function StudioLayout({
       void presence.leave();
       presenceRef.current = null;
     };
-  }, [projectId, userId, userName]);
+  }, [projectId, userId, userName, lowBandwidthMode]);
 
   useEffect(() => {
-    if (!activeFilePath || !presenceRef.current) return;
+    if (lowBandwidthMode || !activeFilePath || !presenceRef.current) return;
     void presenceRef.current.broadcast({
       activeFile: activeFilePath,
     });
-  }, [activeFilePath]);
+  }, [activeFilePath, lowBandwidthMode]);
 
   const activeFile = useMemo(
     () => files.find((file) => file.path === activeFilePath) ?? null,
@@ -426,7 +481,7 @@ export function StudioLayout({
   const handleSelectFile = (path: string): void => {
     setActiveFilePath(path);
     setActiveTab("code");
-    if (presenceRef.current) {
+    if (!lowBandwidthMode && presenceRef.current) {
       void presenceRef.current.broadcast({ activeFile: path });
     }
   };
@@ -445,12 +500,12 @@ export function StudioLayout({
     if (saveTimeoutRef.current[current.path]) {
       window.clearTimeout(saveTimeoutRef.current[current.path]);
     }
-    if (presenceRef.current) {
+    if (!lowBandwidthMode && presenceRef.current) {
       void presenceRef.current.broadcast({ typing: true, activeFile: current.path });
     }
     saveTimeoutRef.current[current.path] = window.setTimeout(() => {
       void persistFile(current.path, value, current.id);
-      if (presenceRef.current) {
+      if (!lowBandwidthMode && presenceRef.current) {
         void presenceRef.current.broadcast({ typing: false, activeFile: current.path });
       }
     }, 500);
@@ -1311,6 +1366,7 @@ export function StudioLayout({
                   conversationId={initialConversationId}
                   initialMessages={initialMessages}
                   currentFiles={files}
+                  lowBandwidthMode={lowBandwidthMode}
                   mobileView={isMobile}
                   onLongPressToggleModeMenu={() => setMobilePlanMenuOpen(true)}
                   autoApply={autoApply}
@@ -1387,6 +1443,7 @@ export function StudioLayout({
               <PreviewPanel
                 files={files}
                 framework={projectFramework}
+                lowBandwidthMode={lowBandwidthMode}
                 onBuildApk={() => setApkModalOpen(true)}
               />
             </PanelErrorBoundary>

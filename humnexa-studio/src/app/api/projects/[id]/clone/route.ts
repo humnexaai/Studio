@@ -1,6 +1,9 @@
 import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 import { createSupabaseServer } from "@/lib/supabase/server";
+import { checkRateLimitByIp, getClientIpFromHeaders } from "@/lib/rate-limit";
+
+export const preferredRegion = "bom1";
 
 type RouteContext = {
   params: {
@@ -9,10 +12,19 @@ type RouteContext = {
 };
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: RouteContext,
 ): Promise<NextResponse> {
   try {
+    const ip = getClientIpFromHeaders(request.headers);
+    const rate = checkRateLimitByIp(ip, 20, 60_000);
+    if (!rate.success) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded. Please wait before retrying", retryAfter: rate.retryAfter },
+        { status: 429, headers: { "Retry-After": String(rate.retryAfter) } },
+      );
+    }
+
     const supabase = createSupabaseServer();
     const {
       data: { user },

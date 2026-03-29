@@ -5,15 +5,16 @@ type ThemeMode = "dark" | "light" | "system";
 type UserState = {
   userId: string | null;
   name: string;
+  email: string | null;
   credits: number;
-  planCode: "free" | "starter" | "pro" | "business";
+  planCode: "free" | "starter" | "pro" | "business" | "student";
   lastModel: string;
   hindiMode: boolean;
   theme: ThemeMode;
   editorFontSize: number;
   editorTabSize: 2 | 4;
   editorFontFamily: "JetBrains Mono" | "Fira Code";
-  setUser: (payload: { userId: string; name: string }) => void;
+  setUser: (payload: { userId: string; name: string; email?: string | null }) => void;
   setCredits: (credits: number) => void;
   setPlanCode: (planCode: UserState["planCode"]) => void;
   setLastModel: (model: string) => void;
@@ -27,6 +28,7 @@ type UserState = {
 export const useUserStore = create<UserState>((set) => ({
   userId: null,
   name: "Builder",
+  email: null,
   credits: 100,
   planCode: "free",
   lastModel: "groq",
@@ -35,7 +37,7 @@ export const useUserStore = create<UserState>((set) => ({
   editorFontSize: 14,
   editorTabSize: 2,
   editorFontFamily: "JetBrains Mono",
-  setUser: ({ userId, name }) => set({ userId, name }),
+  setUser: ({ userId, name, email = null }) => set({ userId, name, email }),
   setCredits: (credits) => set({ credits }),
   setPlanCode: (planCode) => set({ planCode }),
   setLastModel: (lastModel) => set({ lastModel }),

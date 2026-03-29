@@ -75,10 +75,15 @@ export default async function StudioProjectPage({
       status: string;
       branch_name: string | null;
       deployed_url: string | null;
+      project_instructions: string | null;
+      custom_domain: string | null;
+      is_public: boolean | null;
     }>(
       "projects",
     )
-    .select("id,name,framework,status,branch_name,deployed_url")
+    .select(
+      "id,name,framework,status,branch_name,deployed_url,project_instructions,custom_domain,is_public",
+    )
     .eq("id", params.projectId)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -160,6 +165,12 @@ export default async function StudioProjectPage({
           .order("created_at", { ascending: true }) as unknown as Promise<unknown>,
       )
     : { data: [] as Array<{ id: string; role: string; content: string; code_diffs: unknown; credits_used: number; created_at: string }> };
+  const { data: settings } = await supabase
+    .from("user_settings")
+    .select("low_bandwidth_mode")
+    .eq("id", user.id)
+    .maybeSingle();
+  const typedSettings = settings as { low_bandwidth_mode?: boolean | null } | null;
 
   const initialFiles: ProjectFile[] = normalizeProjectFiles(fileRows ?? []);
   const initialVersions = (versions ?? []).map((version) => ({
@@ -181,6 +192,10 @@ export default async function StudioProjectPage({
         initialFiles={initialFiles}
         initialConversationId={conversationId}
         projectFramework={project.framework}
+        initialProjectInstructions={project.project_instructions ?? ""}
+        initialCustomDomain={project.custom_domain ?? null}
+        initialIsPublic={Boolean(project.is_public)}
+        initialLowBandwidthMode={Boolean(typedSettings?.low_bandwidth_mode)}
         initialMessages={
           (messageRows ?? []).map((row) => ({
             id: row.id,

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase/client";
+import posthog from "@/lib/analytics/posthog";
 
 const categories = [
   "E-Commerce",
@@ -25,6 +26,7 @@ export default function OnboardingClient(): React.ReactElement {
   const [preference, setPreference] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
 
   useEffect(() => {
     const run = async (): Promise<void> => {
@@ -158,6 +160,11 @@ export default function OnboardingClient(): React.ReactElement {
       setLoading(false);
       return;
     }
+
+    posthog.capture("user_onboarded", {
+      category: category ?? "unknown",
+      preference: preference ?? "unknown",
+    });
 
     router.push("/dashboard");
     router.refresh();

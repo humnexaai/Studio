@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { formatInr } from "@/lib/utils";
+import { GSTInvoice } from "@/components/india/GSTInvoice";
+import { generateGSTInvoice } from "@/lib/billing/gst-invoice";
 
 type PlanRow = {
   id: string;
@@ -16,36 +18,44 @@ type TransactionRow = {
   amount: number;
   type: "usage" | "purchase" | "refund" | "bonus";
   reason: string | null;
+  metadata?: {
+    amount_inr?: number;
+    order_id?: string;
+    payment_id?: string;
+    plan_id?: string;
+  } | null;
   created_at: string;
 };
 
-type CreateOrderResponse = {
+type SubscriptionRow = {
+  id: string;
+  plan_id: string;
+  plan_name?: string | null;
+  status: string;
+  next_billing_at?: string | null;
+  cancel_at_cycle_end?: boolean | null;
+  razorpay_subscription_id?: string | null;
+};
+
+type CreateSubscriptionResponse = {
   success?: boolean;
   data?: {
-    orderId: string;
-    amount: number;
-    currency: string;
+    subscriptionId: string;
     keyId: string;
   };
   error?: string;
 };
 
-type RazorpaySuccessPayload = {
-  razorpay_payment_id: string;
-  razorpay_order_id: string;
-  razorpay_signature: string;
-};
-
 type RazorpayOptions = {
   key: string;
-  amount: number;
-  currency: string;
   name: string;
   description: string;
-  order_id: string;
+  subscription_id: string;
+  recurring: 1;
   theme?: { color?: string };
-  handler: (response: RazorpaySuccessPayload) => void;
+  handler: (response: Record<string, string>) => void;
   modal?: { ondismiss?: () => void };
+  prefill?: { email?: string };
 };
 
 type RazorpayInstance = {
@@ -88,38 +98,46 @@ export default function BillingClient({
   currentPlanId,
   currentCredits,
   transactions,
+  subscriptions,
 }: {
   plans: PlanRow[];
   currentPlanId: string | null;
   currentCredits: number;
   transactions: TransactionRow[];
+  subscriptions: SubscriptionRow[];
 }): React.ReactElement {
   const [processingPlanId, setProcessingPlanId] = useState<string | null>(null);
   const [checkoutMessage, setCheckoutMessage] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [invoiceTxnId, setInvoiceTxnId] = useState<string | null>(null);
 
   const currentPlan = useMemo(
     () => plans.find((plan) => plan.id === currentPlanId) ?? null,
     [plans, currentPlanId],
   );
 
-  const openCheckout = async (plan: PlanRow): Promise<void> => {
+  const activeSubscription = subscriptions[0] ?? null;
+  const statusLabel =
+    activeSubscription?.status === "cancelled_pending"
+      ? "active (cancel at cycle end)"
+      : activeSubscription?.status ?? "inactive";
+
+  const openSubscriptionCheckout = async (plan: PlanRow): Promise<void> => {
     try {
       setProcessingPlanId(plan.id);
       setCheckoutError(null);
       setCheckoutMessage(null);
 
-      const response = await fetch("/api/payments/create-order", {
+      const response = await fetch("/api/payments/create-subscription", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           planId: plan.id,
-          amount_inr: plan.price_inr,
         }),
       });
-      const payload = (await response.json()) as CreateOrderResponse;
+      const payload = (await response.json()) as CreateSubscriptionResponse;
       if (!response.ok || !payload.data) {
-        throw new Error(payload.error ?? "Unable to create Razorpay order");
+        throw new Error(payload.error ?? "Unable to create Razorpay subscription");
       }
 
       await ensureRazorpayScript();
@@ -130,15 +148,14 @@ export default function BillingClient({
 
       const razorpay = new w.Razorpay({
         key: payload.data.keyId,
-        amount: payload.data.amount,
-        currency: payload.data.currency,
         name: "Humnexa Studio",
-        description: `${plan.name} plan`,
-        order_id: payload.data.orderId,
+        description: `${plan.name} monthly subscription`,
+        subscription_id: payload.data.subscriptionId,
+        recurring: 1,
         theme: { color: "#FF6B2C" },
         handler: () => {
           setCheckoutMessage(
-            "Payment captured. Wallet and plan will update shortly.",
+            "Subscription started. Plan and credits will update shortly.",
           );
           window.setTimeout(() => window.location.reload(), 1200);
         },
@@ -156,6 +173,13 @@ export default function BillingClient({
     } finally {
       setProcessingPlanId(null);
     }
+  };
+
+  const cancelSubscription = async (): Promise<void> => {
+    if (!activeSubscription?.id) return;
+    setCheckoutError(
+      "Cancellation API endpoint is not enabled yet. Please contact support to cancel at cycle end.",
+    );
   };
 
   return (
@@ -193,6 +217,44 @@ export default function BillingClient({
         </div>
       ) : null}
 
+      <section className="rounded-2xl border border-brand-border bg-brand-card p-5">
+        <h2 className="text-lg font-semibold">Subscription Management</h2>
+        {activeSubscription ? (
+          <div className="mt-3 space-y-2 text-sm text-brand-sub">
+            <p>
+              Status:{" "}
+              <span className="font-medium text-brand-text">{statusLabel}</span>
+            </p>
+            {activeSubscription.plan_name ? (
+              <p>
+                Plan: <span className="font-medium text-brand-text">{activeSubscription.plan_name}</span>
+              </p>
+            ) : null}
+            <p>
+              Next billing:{" "}
+              {activeSubscription.next_billing_at
+                ? new Date(activeSubscription.next_billing_at).toLocaleString("en-IN")
+                : "—"}
+            </p>
+            <p>
+              Cancel at cycle end:{" "}
+              {activeSubscription.cancel_at_cycle_end ? "Yes" : "No"}
+            </p>
+            <button
+              type="button"
+              onClick={() => void cancelSubscription()}
+              className="mt-2 rounded-lg border border-brand-border px-3 py-2 text-xs text-brand-sub"
+            >
+              Cancel Subscription
+            </button>
+          </div>
+        ) : (
+          <p className="mt-2 text-sm text-brand-sub">
+            No active subscription. Choose a paid plan below to start UPI AutoPay.
+          </p>
+        )}
+      </section>
+
       <section className="grid gap-4 lg:grid-cols-4">
         {plans.map((plan) => (
           <article
@@ -211,12 +273,26 @@ export default function BillingClient({
             </p>
             <button
               type="button"
-              onClick={() => void openCheckout(plan)}
-              disabled={processingPlanId === plan.id}
+              onClick={() => void openSubscriptionCheckout(plan)}
+              disabled={processingPlanId === plan.id || plan.price_inr === 0}
               className="mt-4 w-full rounded-xl bg-brand-gradient px-3 py-2 text-sm font-semibold disabled:opacity-60"
             >
-              {processingPlanId === plan.id ? "Opening..." : "Choose Plan"}
+              {plan.price_inr === 0
+                ? "Current Free Tier"
+                : processingPlanId === plan.id
+                  ? "Opening..."
+                  : "Subscribe"}
             </button>
+            {plan.code === "student" ? (
+              <p className="mt-2 text-xs text-brand-sub">
+                Student tier requires verification.
+              </p>
+            ) : null}
+            {plan.code === "student" ? (
+              <a href="/student" className="mt-1 block text-xs text-brand-or underline">
+                Learn about student discount
+              </a>
+            ) : null}
           </article>
         ))}
       </section>
@@ -241,12 +317,61 @@ export default function BillingClient({
                 <div className="text-right">
                   <p>{txn.amount > 0 ? "+" : ""}{txn.amount}</p>
                   <p className="text-xs capitalize text-brand-gr">{txn.type}</p>
+                  {txn.type === "purchase" ? (
+                    <button
+                      type="button"
+                      onClick={() => setInvoiceTxnId(txn.id)}
+                      className="mt-1 rounded border border-brand-border px-2 py-0.5 text-[10px] text-brand-sub"
+                    >
+                      Download GST Invoice
+                    </button>
+                  ) : null}
                 </div>
               </div>
             ))
           )}
         </div>
       </section>
+
+      {invoiceTxnId ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-brand-border bg-brand-card p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold">GST Invoice</h3>
+              <button
+                type="button"
+                onClick={() => setInvoiceTxnId(null)}
+                className="rounded border border-brand-border px-2 py-1 text-xs text-brand-sub"
+              >
+                Close
+              </button>
+            </div>
+            <GSTInvoice
+              invoice={generateGSTInvoice({
+                seller: {
+                  name: "PLATINUMGOLD Partnership Firm",
+                  gstin: "27AAPFP0000A1Z5",
+                  address: "Mumbai, Maharashtra, India",
+                },
+                buyer: { name: "Customer" },
+                lineItems: [
+                  {
+                    description: "Humnexa Studio subscription",
+                    amount:
+                      transactions.find((txn) => txn.id === invoiceTxnId)?.metadata
+                        ?.amount_inr ??
+                      Math.abs(
+                        transactions.find((txn) => txn.id === invoiceTxnId)?.amount ?? 0,
+                      ),
+                  },
+                ],
+                isInterState: false,
+                sacCode: "9983",
+              })}
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

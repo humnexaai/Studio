@@ -8,6 +8,9 @@ import { routeAI } from "@/lib/ai/router";
 import { deductCreditsOnSuccess } from "@/lib/credits/deduct";
 import { estimateCredits } from "@/lib/credits/estimate";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { captureServerEvent } from "@/lib/analytics/posthog-server";
+
+export const preferredRegion = "bom1";
 
 const schema = z.object({
   projectId: z.string().uuid(),
@@ -132,9 +135,14 @@ export async function POST(req: Request): Promise<Response> {
       return Response.json(
         {
           error: "Rate limit exceeded. Please wait before retrying",
-          retryAfter: 60,
+          retryAfter: rate.retryAfter,
         },
-        { status: 429 },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(rate.retryAfter),
+          },
+        },
       );
     }
 
@@ -281,6 +289,11 @@ export async function POST(req: Request): Promise<Response> {
 
           if (!planMode && estimatedCost > 0) {
             await deductCreditsOnSuccess(user.id, estimatedCost, "AI generation success");
+            await captureServerEvent("ai_generation_success", {
+              userId: user.id,
+              framework,
+              credits_used: estimatedCost,
+            });
           }
 
           if (diffs.length > 0) {

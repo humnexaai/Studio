@@ -52,6 +52,7 @@ export function CollaboratorsBar({
               <img
                 src={collaborator.avatarUrl}
                 alt={collaborator.name}
+                loading="lazy"
                 className="h-7 w-7 rounded-full object-cover"
               />
             ) : (

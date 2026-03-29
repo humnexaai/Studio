@@ -15,6 +15,7 @@ import { useChat } from "@/hooks/useChat";
 import { estimateCredits } from "@/lib/credits/estimate";
 import type { ProjectFile, QueueItem, SelectedElementContext } from "@/types/studio";
 import { useUserStore } from "@/store/userStore";
+import { sendCreditsLowEmail } from "@/lib/email/send";
 
 type ChatPanelProps = {
   projectId: string;
@@ -28,6 +29,7 @@ type ChatPanelProps = {
   selectedElement: SelectedElementContext | null;
   onApplyFileChanges: (files: Array<{ path: string; content: string }>) => void;
   onRejectChanges: () => void;
+  lowBandwidthMode?: boolean;
 };
 
 export function ChatPanel({
@@ -42,6 +44,7 @@ export function ChatPanel({
   selectedElement,
   onApplyFileChanges,
   onRejectChanges,
+  lowBandwidthMode = false,
 }: ChatPanelProps): React.ReactElement {
   const { messages, typing } = useChatStore();
   const setMessages = useChatStore((state) => state.setMessages);
@@ -63,6 +66,9 @@ export function ChatPanel({
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const [visibleRange, setVisibleRange] = useState({ start: 0, end: 20 });
   const hindiMode = useUserStore((state) => state.hindiMode);
+  const userName = useUserStore((state) => state.name);
+  const userEmail = useUserStore((state) => state.email);
+  const lowCreditEmailSentRef = useRef(false);
 
   const selectedLabel = useMemo(() => {
     if (!selectedElement) return null;
@@ -76,6 +82,24 @@ export function ChatPanel({
   useEffect(() => {
     setInputBlocked(credits <= 0);
   }, [credits]);
+
+  useEffect(() => {
+    if (lowBandwidthMode) return;
+    if (!userEmail) return;
+    if (credits > 20) {
+      lowCreditEmailSentRef.current = false;
+      return;
+    }
+    if (lowCreditEmailSentRef.current) return;
+    lowCreditEmailSentRef.current = true;
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://studio.humnexa.com";
+    void sendCreditsLowEmail({
+      to: userEmail,
+      customerName: userName || "Builder",
+      remainingCredits: credits,
+      upgradeUrl: `${appUrl}/billing`,
+    });
+  }, [credits, userEmail, userName, lowBandwidthMode]);
 
   useEffect(() => {
     setMessages(initialMessages);

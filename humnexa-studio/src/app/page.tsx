@@ -1,6 +1,9 @@
 import { redirect } from "next/navigation";
 import { ArrowRight, Mic, Paperclip, Sparkles } from "lucide-react";
 import { createSupabaseServer } from "@/lib/supabase/server";
+import packageJson from "../../package.json";
+
+export const revalidate = 3600;
 
 const promptChips = [
   "Build me a GST billing dashboard with invoice PDF",
@@ -19,14 +22,43 @@ const projectCards = [
 
 const softwareApplicationJsonLd = {
   "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
+  "@type": "WebApplication",
   name: "Humnexa Studio",
+  url: process.env.NEXT_PUBLIC_APP_URL ?? "https://studio.humnexa.com",
+  operatingSystem: "Web",
   applicationCategory: "DeveloperApplication",
-  offers: {
-    "@type": "Offer",
-    price: 199,
-    priceCurrency: "INR",
-  },
+  description:
+    "Build any app with AI. UPI payments, Hindi support, 40 plus languages. India first.",
+  softwareVersion: packageJson.version,
+  offers: [
+    {
+      "@type": "Offer",
+      name: "Free Plan",
+      price: 0,
+      priceCurrency: "INR",
+    },
+    {
+      "@type": "Offer",
+      name: "Starter Plan",
+      price: 199,
+      priceCurrency: "INR",
+    },
+  ],
+};
+
+const organizationJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "PLATINUMGOLD Partnership Firm",
+  url: process.env.NEXT_PUBLIC_APP_URL ?? "https://studio.humnexa.com",
+  contactPoint: [
+    {
+      "@type": "ContactPoint",
+      contactType: "customer service",
+      email: "support@humnexa.com",
+      availableLanguage: ["en-IN", "hi-IN"],
+    },
+  ],
 };
 
 export default function Home(): React.ReactElement {
@@ -64,6 +96,13 @@ export default function Home(): React.ReactElement {
         // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{
           __html: JSON.stringify(softwareApplicationJsonLd),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(organizationJsonLd),
         }}
       />
       <div className="pointer-events-none absolute inset-0 opacity-35">
@@ -160,6 +199,20 @@ export default function Home(): React.ReactElement {
           <Metric label="Starting" value="₹420/mo" />
           <Metric label="Uptime" value="99.9%" />
         </footer>
+        <div className="flex flex-wrap items-center justify-center gap-3 pb-3 text-xs text-brand-sub">
+          <a href="/terms" className="underline">
+            Terms
+          </a>
+          <a href="/privacy" className="underline">
+            Privacy
+          </a>
+          <a href="/refund" className="underline">
+            Refund
+          </a>
+          <a href="/grievance" className="underline">
+            Grievance Officer
+          </a>
+        </div>
       </div>
     </main>
   );

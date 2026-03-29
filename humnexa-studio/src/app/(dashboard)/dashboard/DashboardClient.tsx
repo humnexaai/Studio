@@ -37,6 +37,15 @@ type FrameworkOption =
   | "flutter"
   | "react-native";
 
+const frameworkDisplayNames: Record<FrameworkOption, string> = {
+  nextjs: "Next.js",
+  react: "React",
+  vue: "Vue",
+  python: "Python",
+  flutter: "Flutter",
+  "react-native": "React Native (Expo)",
+};
+
 export default function DashboardClient({
   userName,
   creditsBalance,
@@ -199,12 +208,13 @@ export default function DashboardClient({
                 }
                 className="w-full rounded-xl border border-brand-border bg-brand-card2 px-3 py-2 text-sm outline-none"
               >
-                <option value="nextjs">Next.js</option>
-                <option value="react">React</option>
-                <option value="vue">Vue</option>
-                <option value="python">Python</option>
-                <option value="flutter">Flutter</option>
-                <option value="react-native">React Native (Expo)</option>
+                {(Object.keys(frameworkDisplayNames) as FrameworkOption[]).map(
+                  (value) => (
+                    <option key={value} value={value}>
+                      {frameworkDisplayNames[value]}
+                    </option>
+                  ),
+                )}
               </select>
               {error ? <p className="text-sm text-brand-error">{error}</p> : null}
             </div>

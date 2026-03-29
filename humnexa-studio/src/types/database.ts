@@ -51,6 +51,7 @@ export type Database = {
           chat_mode: "chat" | "chat_code" | "full_control";
           hindi_mode: boolean;
           workspace_knowledge?: string;
+          low_bandwidth_mode?: boolean;
           editor_font_size: number;
           editor_tab_size: number;
           editor_font_family: string;
@@ -68,6 +69,31 @@ export type Database = {
           id: string;
         };
         Update: Partial<Database["public"]["Tables"]["user_settings"]["Row"]>;
+      };
+      subscriptions: {
+        Row: {
+          id: string;
+          user_id: string;
+          plan_id: string;
+          razorpay_subscription_id: string | null;
+          razorpay_plan_id?: string | null;
+          status: string;
+          start_date: string;
+          end_date: string | null;
+          next_billing_at?: string | null;
+          cancel_at_cycle_end?: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<
+          Database["public"]["Tables"]["subscriptions"]["Row"],
+          "id" | "created_at" | "updated_at"
+        > & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["subscriptions"]["Row"]>;
       };
       projects: {
         Row: {
@@ -301,6 +327,22 @@ export type Database = {
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["project_collaborators"]["Row"]>;
+      };
+      processed_webhook_events: {
+        Row: {
+          id: string;
+          event_id: string;
+          event_type: string | null;
+          processed_at: string;
+        };
+        Insert: Omit<
+          Database["public"]["Tables"]["processed_webhook_events"]["Row"],
+          "id" | "processed_at"
+        > & {
+          id?: string;
+          processed_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["processed_webhook_events"]["Row"]>;
       };
     };
     Views: Record<string, never>;
