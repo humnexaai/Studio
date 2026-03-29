@@ -11,7 +11,6 @@ import {
   File,
   Folder,
   FolderPlus,
-  Leaf,
   MoreHorizontal,
   Plus,
   ReceiptText,
@@ -288,25 +287,33 @@ function TreeNode({
   );
 }
 
+function fileLabel(text: string, className: string): React.ReactElement {
+  return (
+    <span className={cn("inline-flex min-w-6 justify-center rounded px-1 text-[10px] font-bold", className)}>
+      {text}
+    </span>
+  );
+}
+
 function fileIconForPath(path: string): React.ReactNode {
   const lower = path.toLowerCase();
   if (lower.endsWith(".py")) {
-    return <span className="text-sm">🐍</span>;
+    return fileLabel("PY", "bg-blue-500/20 text-blue-300");
   }
   if (lower.endsWith(".go")) {
-    return <span className="text-sm">🩵</span>;
-  }
-  if (lower.endsWith(".java")) {
-    return <span className="text-sm">☕</span>;
+    return fileLabel("GO", "bg-cyan-500/20 text-cyan-300");
   }
   if (lower.endsWith(".dart")) {
-    return <span className="text-sm">🎯</span>;
-  }
-  if (lower.endsWith(".vue")) {
-    return <Leaf className="h-4 w-4 text-green-500" />;
+    return fileLabel("◆ DART", "bg-sky-500/20 text-sky-300");
   }
   if (lower.endsWith(".rs")) {
-    return <span className="text-sm">🦀</span>;
+    return fileLabel("RS", "bg-orange-500/20 text-orange-300");
+  }
+  if (lower.endsWith(".kt")) {
+    return fileLabel("KT", "bg-purple-500/20 text-purple-300");
+  }
+  if (lower.endsWith(".cs")) {
+    return fileLabel("CS", "bg-emerald-500/20 text-emerald-300");
   }
   if (lower.endsWith(".json")) {
     return <FileJson2 className="h-4 w-4 text-yellow-500" />;

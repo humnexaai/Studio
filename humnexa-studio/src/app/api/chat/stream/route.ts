@@ -95,7 +95,6 @@ export async function POST(req: Request): Promise<Response> {
     const supabase = createSupabaseServer();
     const dbWriter = supabase as unknown as {
       from: (table: string) => {
-        upsert?: (values: Record<string, unknown>) => Promise<unknown>;
         update?: (values: Record<string, unknown>) => {
           eq: (column: string, value: string) => Promise<unknown>;
         };
@@ -140,6 +139,38 @@ export async function POST(req: Request): Promise<Response> {
     }
 
     const parsed = schema.parse(await req.json());
+
+    const { data: projectRow } = await supabase
+      .from("projects")
+      .select("name,framework,project_instructions")
+      .eq("id", parsed.projectId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    const typedProject = projectRow as
+      | {
+          name?: string | null;
+          framework?: string | null;
+          project_instructions?: string | null;
+        }
+      | null;
+
+    const { data: settingsRow } = await supabase
+      .from("user_settings")
+      .select("hindi_mode,workspace_knowledge")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    const typedSettings = settingsRow as
+      | { hindi_mode?: boolean; workspace_knowledge?: string | null }
+      | null;
+
+    const framework = typedProject?.framework ?? "nextjs";
+    const projectName = typedProject?.name ?? `Project ${parsed.projectId.slice(0, 8)}`;
+    const projectInstructions = typedProject?.project_instructions ?? null;
+    const workspaceKnowledge = typedSettings?.workspace_knowledge ?? null;
+    const hindiMode = typedSettings?.hindi_mode ?? false;
+
     const planMode = parsed.planMode ?? parsed.mode === "plan";
     const estimatedCost = planMode ? 0 : estimateCredits(parsed.message, "agent");
 
@@ -173,23 +204,19 @@ export async function POST(req: Request): Promise<Response> {
       updatedAt: file.updatedAt ?? new Date().toISOString(),
     }));
 
-    const { data: settings } = await supabase
-      .from("user_settings")
-      .select("hindi_mode")
-      .eq("id", user.id)
-      .maybeSingle();
-    const typedSettings = settings as { hindi_mode?: boolean } | null;
-    const hindiMode = typedSettings?.hindi_mode ?? false;
-
     const systemPrompt =
       planMode
         ? buildPlanModePrompt()
         : buildSystemPrompt(
             currentFilesForPrompt,
             "agent",
-            `Project ${parsed.projectId.slice(0, 8)}`,
-            "nextjs",
-            { hindiMode },
+            projectName,
+            framework,
+            {
+              hindiMode,
+              projectInstructions,
+              workspaceKnowledge,
+            },
           );
 
     type HistoryMessage = { role: string; content: string };

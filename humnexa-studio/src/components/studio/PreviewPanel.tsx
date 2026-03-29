@@ -11,6 +11,7 @@ import type { ProjectFile } from "@/types/studio";
 type PreviewPanelProps = {
   files: ProjectFile[];
   framework: string;
+  onBuildApk?: () => void;
 };
 
 const PREVIEW_CHANNEL = "HUMNEXA_PREVIEW";
@@ -19,6 +20,14 @@ const VISUAL_RUNTIME_FLAG = "__HUMNEXA_VISUAL_RUNTIME__";
 function supportsLivePreview(framework: string): boolean {
   const normalized = framework.toLowerCase();
   return normalized === "nextjs" || normalized === "react" || normalized === "vue";
+}
+
+function isReactNativeFramework(framework: string): boolean {
+  return framework.toLowerCase() === "react-native";
+}
+
+function isFlutterFramework(framework: string): boolean {
+  return framework.toLowerCase() === "flutter";
 }
 
 function mapFrameworkToTemplate(framework: string): SandpackTemplate {
@@ -53,6 +62,7 @@ function mapFilesToSandpack(files: ProjectFile[]): Record<string, { code: string
 export function PreviewPanel({
   files,
   framework,
+  onBuildApk,
 }: PreviewPanelProps): React.ReactElement {
   const device = useStudioStore((state) => state.previewDevice);
   const setDevice = useStudioStore((state) => state.setPreviewDevice);
@@ -62,6 +72,8 @@ export function PreviewPanel({
   const cleanupRef = useRef<(() => void) | null>(null);
   const [ready, setReady] = useState(false);
   const livePreview = supportsLivePreview(framework);
+  const reactNativePreview = isReactNativeFramework(framework);
+  const flutterPreview = isFlutterFramework(framework);
 
   const sandpackFiles = useMemo(() => mapFilesToSandpack(files), [files]);
 
@@ -298,10 +310,42 @@ export function PreviewPanel({
               widthClass,
             )}
           />
+        ) : reactNativePreview ? (
+          <div className="flex h-full w-full flex-col items-center justify-center gap-4 rounded-xl border border-brand-border bg-brand-card2 p-6 text-center">
+            <div className="relative mx-auto h-[360px] w-[190px] rounded-[2.5rem] border-4 border-brand-border bg-brand-bg p-3 shadow-2xl">
+              <div className="h-full w-full rounded-[2rem] border border-brand-border bg-[#0d1324] px-3 py-5 text-center">
+                <div className="mx-auto mb-4 h-1 w-12 rounded-full bg-brand-border" />
+                <p className="font-display text-lg font-bold text-brand-or">React Native App</p>
+                <p className="mt-2 text-xs text-brand-sub">Expo preview placeholder</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onBuildApk}
+              className="rounded-lg bg-brand-gradient px-4 py-2 text-sm font-semibold text-white"
+            >
+              Build APK
+            </button>
+          </div>
+        ) : flutterPreview ? (
+          <div className="flex h-full w-full items-center justify-center rounded-xl border border-brand-border bg-brand-card2 p-6">
+            <div className="w-full max-w-lg rounded-xl border border-brand-border bg-brand-bg p-5 text-left">
+              <h3 className="text-base font-semibold text-brand-text">
+                Flutter preview is not available in browser
+              </h3>
+              <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-brand-sub">
+                <li>Install Flutter SDK on your machine.</li>
+                <li>Run <code className="rounded bg-brand-card px-1 py-0.5">flutter pub get</code>.</li>
+                <li>
+                  Run <code className="rounded bg-brand-card px-1 py-0.5">flutter run</code> on a device or emulator.
+                </li>
+              </ul>
+            </div>
+          </div>
         ) : (
           <div className="flex h-full w-full items-center justify-center rounded-xl border border-brand-border bg-brand-card2 p-6 text-center text-sm text-brand-sub">
             Live preview not available for this framework. Server-side preview coming in
-            Phase 3.
+            Phase 4.
           </div>
         )}
       </div>
@@ -310,7 +354,11 @@ export function PreviewPanel({
           ? ready
             ? `● Preview ready · Edit ${visualEditEnabled ? "on" : "off"}`
             : "● Building preview..."
-          : `● ${framework} editor mode`}
+          : reactNativePreview
+            ? "● React Native preview mock"
+            : flutterPreview
+              ? "● Flutter local-run instructions"
+              : `● ${framework} editor mode`}
       </div>
     </aside>
   );

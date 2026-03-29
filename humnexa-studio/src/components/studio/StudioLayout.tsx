@@ -166,6 +166,10 @@ export function StudioLayout({
   const [templatePriceInr, setTemplatePriceInr] = useState(0);
   const [templateTagsInput, setTemplateTagsInput] = useState("");
   const [templateIndiaSpecific, setTemplateIndiaSpecific] = useState(true);
+  const [apkModalOpen, setApkModalOpen] = useState(false);
+  const [apkBuilding, setApkBuilding] = useState(false);
+  const [apkBuildMessage, setApkBuildMessage] = useState<string | null>(null);
+  const [apkBuildUrl, setApkBuildUrl] = useState<string | null>(null);
   const desktopNotifiedRef = useRef<string[]>([]);
   const pushTimeoutRef = useRef<number | null>(null);
   const saveTimeoutRef = useRef<Record<string, number>>({});
@@ -885,6 +889,41 @@ export function StudioLayout({
     }
   };
 
+  const startApkBuild = async (): Promise<void> => {
+    try {
+      setApkBuilding(true);
+      const response = await fetch(`/api/projects/${projectId}/build-apk`, {
+        method: "POST",
+      });
+      const payload = (await response.json()) as {
+        error?: string;
+        data?: {
+          message?: string;
+          mockBuildUrl?: string;
+          expoTestInstructions?: string[];
+        };
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Failed to start APK build");
+      }
+
+      setApkBuildMessage(payload.data?.message ?? "APK build request submitted.");
+      setApkBuildUrl(payload.data?.mockBuildUrl ?? null);
+      setToastTone("success");
+      setPushToast("APK build queued successfully.");
+    } catch (error) {
+      setToastTone("error");
+      setPushToast(error instanceof Error ? error.message : "APK build failed");
+    } finally {
+      setApkBuilding(false);
+      if (pushTimeoutRef.current) {
+        window.clearTimeout(pushTimeoutRef.current);
+      }
+      pushTimeoutRef.current = window.setTimeout(() => setPushToast(null), 3500);
+    }
+  };
+
   return (
     <div className="flex min-h-screen flex-col bg-brand-bg">
       <StudioNavbar
@@ -1034,7 +1073,11 @@ export function StudioLayout({
             </button>
           ) : (
             <PanelErrorBoundary panelName="PreviewPanel">
-              <PreviewPanel files={files} framework={projectFramework} />
+              <PreviewPanel
+                files={files}
+                framework={projectFramework}
+                onBuildApk={() => setApkModalOpen(true)}
+              />
             </PanelErrorBoundary>
           )}
         </aside>
@@ -1163,6 +1206,59 @@ export function StudioLayout({
                 className="rounded-lg bg-brand-gradient px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
               >
                 {templateSubmitting ? "Submitting..." : "Submit for Review"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {apkModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-xl rounded-2xl border border-brand-border bg-brand-card p-5">
+            <h3 className="text-lg font-semibold">Build APK with Expo</h3>
+            <p className="mt-2 text-sm text-brand-sub">
+              Direct cloud EAS build will be enabled once EXPO_TOKEN is configured. You can test immediately using Expo Go.
+            </p>
+            <div className="mt-4 rounded-xl border border-brand-border bg-brand-card2 p-3">
+              <p className="text-xs uppercase tracking-wide text-brand-muted">Run locally</p>
+              <code className="mt-2 block rounded bg-brand-bg px-2 py-1 font-code text-sm text-brand-or">
+                npx expo start
+              </code>
+              <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-brand-sub">
+                <li>Install Expo Go on your phone.</li>
+                <li>Run the command in your React Native project root.</li>
+                <li>Scan the QR code to test instantly.</li>
+              </ul>
+            </div>
+            {apkBuildMessage ? (
+              <p className="mt-3 text-sm text-brand-gr">{apkBuildMessage}</p>
+            ) : null}
+            {apkBuildUrl ? (
+              <a
+                href={apkBuildUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 block text-sm text-brand-or underline"
+              >
+                {apkBuildUrl}
+              </a>
+            ) : null}
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setApkModalOpen(false)}
+                className="rounded-lg border border-brand-border px-3 py-2 text-sm text-brand-sub"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void startApkBuild();
+                }}
+                disabled={apkBuilding}
+                className="rounded-lg bg-brand-gradient px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {apkBuilding ? "Starting..." : "Start Mock APK Build"}
               </button>
             </div>
           </div>

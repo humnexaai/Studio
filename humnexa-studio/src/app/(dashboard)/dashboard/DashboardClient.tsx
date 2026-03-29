@@ -28,7 +28,13 @@ type DashboardClientProps = {
   transactions: TransactionRow[];
 };
 
-type FrameworkOption = "nextjs" | "react" | "vue" | "python" | "flutter";
+type FrameworkOption =
+  | "nextjs"
+  | "react"
+  | "vue"
+  | "python"
+  | "flutter"
+  | "react-native";
 
 export default function DashboardClient({
   userName,
@@ -132,7 +138,7 @@ export default function DashboardClient({
             </button>
           </div>
         ) : (
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
             {projects.map((project) => (
               <ProjectCard
                 key={project.id}
@@ -174,6 +180,7 @@ export default function DashboardClient({
                 <option value="vue">Vue</option>
                 <option value="python">Python</option>
                 <option value="flutter">Flutter</option>
+                <option value="react-native">React Native (Expo)</option>
               </select>
               {error ? <p className="text-sm text-brand-error">{error}</p> : null}
             </div>

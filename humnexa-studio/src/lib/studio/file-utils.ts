@@ -9,6 +9,9 @@ export function detectLanguageFromPath(path: string): string {
   if (lower.endsWith(".md")) return "markdown";
   if (lower.endsWith(".py")) return "python";
   if (lower.endsWith(".go")) return "go";
+  if (lower.endsWith(".dart")) return "dart";
+  if (lower.endsWith(".kt")) return "kotlin";
+  if (lower.endsWith(".cs")) return "csharp";
   if (lower.endsWith(".rs")) return "rust";
   return "plaintext";
 }
