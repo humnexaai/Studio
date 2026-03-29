@@ -17,6 +17,18 @@ const projectCards = [
   { title: "Naukri Pro", status: "Building", stack: "Next.js + Groq" },
 ];
 
+const softwareApplicationJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Humnexa Studio",
+  applicationCategory: "DeveloperApplication",
+  offers: {
+    "@type": "Offer",
+    price: 199,
+    priceCurrency: "INR",
+  },
+};
+
 export default function Home(): React.ReactElement {
   async function handleBuild(formData: FormData): Promise<void> {
     "use server";
@@ -47,6 +59,13 @@ export default function Home(): React.ReactElement {
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-brand-bg px-6 py-10">
+      <script
+        type="application/ld+json"
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(softwareApplicationJsonLd),
+        }}
+      />
       <div className="pointer-events-none absolute inset-0 opacity-35">
         <div className="absolute left-1/2 top-20 h-72 w-72 -translate-x-1/2 rounded-full bg-brand-or blur-[140px]" />
         <div className="absolute bottom-0 right-20 h-56 w-56 rounded-full bg-brand-gr blur-[120px]" />

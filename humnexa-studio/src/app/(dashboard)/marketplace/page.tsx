@@ -1,7 +1,12 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import MarketplaceClient from "./MarketplaceClient";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
+
+export const metadata: Metadata = {
+  title: "Template Marketplace",
+};
 
 type TemplateSeed = {
   slug: string;

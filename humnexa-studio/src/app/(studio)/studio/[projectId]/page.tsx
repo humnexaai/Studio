@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { StudioLayout } from "@/components/studio/StudioLayout";
 import { createSupabaseServer } from "@/lib/supabase/server";
@@ -7,6 +8,32 @@ import type { ProjectFile } from "@/types/studio";
 type Props = {
   params: { projectId: string };
 };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const supabase = createSupabaseServer();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return {
+      title: "Studio",
+    };
+  }
+
+  const { data: project } = await supabase
+    .from("projects")
+    .select("name")
+    .eq("id", params.projectId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const typedProject = project as { name?: string | null } | null;
+
+  return {
+    title: typedProject?.name?.trim() || "Studio",
+  };
+}
 
 export default async function StudioProjectPage({
   params,
