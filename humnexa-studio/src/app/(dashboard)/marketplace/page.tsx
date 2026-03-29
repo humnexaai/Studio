@@ -34,6 +34,13 @@ type MarketplaceTemplate = {
   rating: number;
 };
 
+type ExploreProject = {
+  id: string;
+  name: string;
+  framework: string;
+  createdAt: string;
+};
+
 type MyTemplate = {
   id: string;
   name: string;
@@ -318,5 +325,33 @@ export default async function MarketplacePage(): Promise<React.ReactElement> {
       createdAt: row.created_at,
     }));
 
-  return <MarketplaceClient templates={templates} myTemplates={myTemplates} />;
+  const { data: publicProjectsRows } = await supabase
+    .from("projects")
+    .select("id,name,framework,created_at,is_public")
+    .eq("is_public", true)
+    .order("created_at", { ascending: false })
+    .limit(30);
+
+  const exploreProjects: ExploreProject[] = (publicProjectsRows ?? []).map((row) => {
+    const typed = row as {
+      id: string;
+      name: string;
+      framework: string;
+      created_at: string;
+    };
+    return {
+      id: typed.id,
+      name: typed.name,
+      framework: typed.framework,
+      createdAt: typed.created_at,
+    };
+  });
+
+  return (
+    <MarketplaceClient
+      templates={templates}
+      myTemplates={myTemplates}
+      exploreProjects={exploreProjects}
+    />
+  );
 }

@@ -7,6 +7,7 @@ import { NotificationsBell } from "@/components/notifications/NotificationsBell"
 
 const navItems = [
   { href: "/dashboard", label: "Projects" },
+  { href: "/dashboard/analytics", label: "Analytics" },
   { href: "/marketplace", label: "Marketplace" },
   { href: "/billing", label: "Credits" },
   { href: "/dashboard/team", label: "Team" },

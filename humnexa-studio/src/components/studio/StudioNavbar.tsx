@@ -8,6 +8,7 @@ import {
   Home,
   GitBranch,
   Pencil,
+  Swords,
 } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
 import { cn } from "@/lib/utils";
@@ -17,6 +18,8 @@ type StudioNavbarProps = {
   userId: string;
   projectName: string;
   credits: number;
+  collaboratorsCount?: number;
+  collaboratorsSlot?: React.ReactNode;
   statusText?: string;
   onDeploy?: () => void;
   onPush?: () => void;
@@ -27,6 +30,7 @@ type StudioNavbarProps = {
   onTogglePreview?: () => void;
   onToggleVersions?: () => void;
   onPublishTemplate?: () => void;
+  onOpenArena?: () => void;
   visualEditEnabled?: boolean;
   onToggleVisualEdit?: () => void;
 };
@@ -35,6 +39,8 @@ export function StudioNavbar({
   userId,
   projectName,
   credits,
+  collaboratorsCount = 0,
+  collaboratorsSlot = null,
   statusText = "Ready to build",
   onDeploy,
   onPush,
@@ -45,6 +51,7 @@ export function StudioNavbar({
   onTogglePreview,
   onToggleVersions,
   onPublishTemplate,
+  onOpenArena,
   visualEditEnabled = false,
   onToggleVisualEdit,
 }: StudioNavbarProps): React.ReactElement {
@@ -68,6 +75,14 @@ export function StudioNavbar({
       </span>
       <div className="mx-auto text-xs text-brand-sub">{statusText}</div>
       <div className="flex items-center gap-2">
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded-lg border border-brand-border bg-brand-card px-2 py-1 text-xs text-brand-sub"
+          title="Active collaborators"
+        >
+          👥 {collaboratorsCount}
+        </button>
+        {collaboratorsSlot}
         <NotificationsBell userId={userId} compact />
         <span className="inline-flex items-center gap-1 rounded-md border border-brand-border bg-brand-card px-2 py-1 text-xs text-brand-text">
           <Coins className="h-3.5 w-3.5 text-brand-or" />
@@ -117,6 +132,16 @@ export function StudioNavbar({
         >
           Publish Template
         </button>
+        {onOpenArena ? (
+          <button
+            type="button"
+            onClick={onOpenArena}
+            className="inline-flex items-center gap-1 rounded-lg border border-brand-border bg-brand-card px-2 py-1 text-xs text-brand-sub transition hover:text-brand-text"
+          >
+            <Swords className="h-3.5 w-3.5" />
+            Arena Mode
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={onDeploy}

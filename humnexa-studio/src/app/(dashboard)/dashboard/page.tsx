@@ -21,7 +21,7 @@ export default async function DashboardPage(): Promise<React.ReactElement> {
     await Promise.all([
       supabase
         .from("projects")
-        .select("*")
+        .select("id,name,framework,status,updated_at,is_public")
         .eq("user_id", user.id)
         .order("updated_at", { ascending: false }),
       supabase
@@ -42,11 +42,20 @@ export default async function DashboardPage(): Promise<React.ReactElement> {
     credits_balance?: number | null;
   } | null;
 
+  type ProjectRow = {
+    id: string;
+    name: string;
+    framework: string;
+    status: string;
+    updated_at: string;
+    is_public?: boolean;
+  };
+
   return (
     <DashboardClient
       userName={typedProfile?.full_name || "Builder"}
       creditsBalance={typedProfile?.credits_balance ?? 0}
-      projects={projects ?? []}
+      projects={(projects ?? []) as ProjectRow[]}
       transactions={transactions ?? []}
     />
   );

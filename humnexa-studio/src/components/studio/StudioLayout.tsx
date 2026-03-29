@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { nanoid } from "nanoid";
 import FileTree from "@/components/studio/FileTree";
@@ -16,6 +17,7 @@ import { PanelErrorBoundary } from "@/components/ui/PanelErrorBoundary";
 import { useStudioStore } from "@/store/studioStore";
 import { useUserStore } from "@/store/userStore";
 import { supabase } from "@/lib/supabase/client";
+import { createProjectPresence } from "@/lib/collaboration/presence";
 import { detectLanguageFromPath } from "@/lib/studio/file-utils";
 import { estimateCredits } from "@/lib/credits/estimate";
 import type { ProjectFile } from "@/types/studio";
@@ -90,6 +92,9 @@ type StudioLayoutProps = {
   initialFiles: ProjectFile[];
   initialConversationId: string | null;
   projectFramework: string;
+  initialProjectInstructions?: string | null;
+  initialCustomDomain?: string | null;
+  initialIsPublic?: boolean;
   initialMessages: Array<{
     id: string;
     role: "user" | "assistant";
@@ -120,9 +125,13 @@ export function StudioLayout({
   initialFiles,
   initialConversationId,
   projectFramework,
+  initialProjectInstructions,
+  initialCustomDomain,
+  initialIsPublic,
   initialMessages,
   initialVersions,
 }: StudioLayoutProps): React.ReactElement {
+  const router = useRouter();
   const [files, setFiles] = useState<ProjectFile[]>(initialFiles);
   const [activeFilePath, setActiveFilePath] = useState<string | null>(
     initialFiles[0]?.path ?? null,
@@ -170,9 +179,26 @@ export function StudioLayout({
   const [apkBuilding, setApkBuilding] = useState(false);
   const [apkBuildMessage, setApkBuildMessage] = useState<string | null>(null);
   const [apkBuildUrl, setApkBuildUrl] = useState<string | null>(null);
+  const [projectInstructions, setProjectInstructions] = useState(
+    initialProjectInstructions ?? "",
+  );
+  const [customDomain, setCustomDomain] = useState(initialCustomDomain ?? "");
+  const [domainMessage, setDomainMessage] = useState<string | null>(null);
+  const [domainModalOpen, setDomainModalOpen] = useState(false);
+  const [domainVerifying, setDomainVerifying] = useState(false);
+  const [publicProject, setPublicProject] = useState(Boolean(initialIsPublic));
+  const [savingProjectSettings, setSavingProjectSettings] = useState(false);
+  const [collaborators, setCollaborators] = useState<
+    Array<{ userId: string; name: string; avatarUrl: string | null; activeFile?: string | null }>
+  >([]);
+  const [collabInviteEmail, setCollabInviteEmail] = useState("");
+  const [collabInviteRole, setCollabInviteRole] = useState<"viewer" | "editor">(
+    "viewer",
+  );
   const desktopNotifiedRef = useRef<string[]>([]);
   const pushTimeoutRef = useRef<number | null>(null);
   const saveTimeoutRef = useRef<Record<string, number>>({});
+  const presenceRef = useRef<ReturnType<typeof createProjectPresence> | null>(null);
   const {
     chatWidth,
     previewWidth,
@@ -203,6 +229,7 @@ export function StudioLayout({
   }, [autoApply]);
   const credits = useUserStore((state) => state.credits);
   const userId = useUserStore((state) => state.userId);
+  const userName = useUserStore((state) => state.name);
   const lastModel = useUserStore((state) => state.lastModel);
 
   useEffect(() => {
@@ -271,6 +298,42 @@ export function StudioLayout({
     };
   }, [projectId]);
 
+  useEffect(() => {
+    if (!userId) return;
+    const presence = createProjectPresence(
+      projectId,
+      {
+        id: userId,
+        name: userName || "Builder",
+        avatarUrl: null,
+      },
+      {
+        onSync: (users) => {
+          setCollaborators(
+            users.map((u) => ({
+              userId: u.userId,
+              name: u.name,
+              avatarUrl: u.avatarUrl,
+              activeFile: u.activeFile,
+            })),
+          );
+        },
+      },
+    );
+    presenceRef.current = presence;
+    return () => {
+      void presence.leave();
+      presenceRef.current = null;
+    };
+  }, [projectId, userId, userName]);
+
+  useEffect(() => {
+    if (!activeFilePath || !presenceRef.current) return;
+    void presenceRef.current.broadcast({
+      activeFile: activeFilePath,
+    });
+  }, [activeFilePath]);
+
   const activeFile = useMemo(
     () => files.find((file) => file.path === activeFilePath) ?? null,
     [files, activeFilePath],
@@ -324,6 +387,9 @@ export function StudioLayout({
   const handleSelectFile = (path: string): void => {
     setActiveFilePath(path);
     setActiveTab("code");
+    if (presenceRef.current) {
+      void presenceRef.current.broadcast({ activeFile: path });
+    }
   };
 
   const handleCodeChange = (value: string): void => {
@@ -340,8 +406,14 @@ export function StudioLayout({
     if (saveTimeoutRef.current[current.path]) {
       window.clearTimeout(saveTimeoutRef.current[current.path]);
     }
+    if (presenceRef.current) {
+      void presenceRef.current.broadcast({ typing: true, activeFile: current.path });
+    }
     saveTimeoutRef.current[current.path] = window.setTimeout(() => {
       void persistFile(current.path, value, current.id);
+      if (presenceRef.current) {
+        void presenceRef.current.broadcast({ typing: false, activeFile: current.path });
+      }
     }, 500);
   };
 
@@ -924,6 +996,100 @@ export function StudioLayout({
     }
   };
 
+  const saveProjectSettings = async (): Promise<void> => {
+    try {
+      setSavingProjectSettings(true);
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectInstructions: projectInstructions.slice(0, 10000),
+          customDomain: customDomain.trim(),
+          isPublic: publicProject,
+        }),
+      });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Failed to save project settings");
+      }
+      setToastTone("success");
+      setPushToast("Project settings updated.");
+    } catch (error) {
+      setToastTone("error");
+      setPushToast(error instanceof Error ? error.message : "Failed to save settings");
+    } finally {
+      setSavingProjectSettings(false);
+      if (pushTimeoutRef.current) {
+        window.clearTimeout(pushTimeoutRef.current);
+      }
+      pushTimeoutRef.current = window.setTimeout(() => setPushToast(null), 3200);
+    }
+  };
+
+  const saveCustomDomain = async (): Promise<void> => {
+    try {
+      setDomainVerifying(true);
+      const response = await fetch(`/api/projects/${projectId}/domain`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domain: customDomain.trim() }),
+      });
+      const payload = (await response.json()) as {
+        error?: string;
+        data?: { verified?: boolean; instruction?: string };
+      };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Failed to configure custom domain");
+      }
+      setDomainMessage(
+        payload.data?.verified
+          ? "Domain verified successfully."
+          : payload.data?.instruction ??
+              "Add a CNAME record pointing your domain to cname.vercel-dns.com, then verify.",
+      );
+      setDomainModalOpen(true);
+    } catch (error) {
+      setToastTone("error");
+      setPushToast(error instanceof Error ? error.message : "Domain setup failed");
+    } finally {
+      setDomainVerifying(false);
+    }
+  };
+
+  const openArenaMode = (): void => {
+    router.push(`/studio/${projectId}/arena`);
+  };
+
+
+  const inviteCollaborator = async (): Promise<void> => {
+    if (!collabInviteEmail.trim()) return;
+    try {
+      const response = await fetch(`/api/projects/${projectId}/collaborators`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: collabInviteEmail.trim().toLowerCase(),
+          role: collabInviteRole,
+        }),
+      });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Invite failed");
+      }
+      setCollabInviteEmail("");
+      setToastTone("success");
+      setPushToast("Collaborator invited.");
+    } catch (error) {
+      setToastTone("error");
+      setPushToast(error instanceof Error ? error.message : "Invite failed");
+    } finally {
+      if (pushTimeoutRef.current) {
+        window.clearTimeout(pushTimeoutRef.current);
+      }
+      pushTimeoutRef.current = window.setTimeout(() => setPushToast(null), 2600);
+    }
+  };
+
   return (
     <div className="flex min-h-screen flex-col bg-brand-bg">
       <StudioNavbar
@@ -941,15 +1107,97 @@ export function StudioLayout({
         onTogglePreview={togglePreviewCollapsed}
         onToggleVersions={() => setVersionOpen((v) => !v)}
         onPublishTemplate={() => setTemplateModalOpen(true)}
+        onOpenArena={openArenaMode}
+        collaboratorsCount={collaborators.length}
+        collaboratorsSlot={null}
       />
       <div className="border-b border-brand-border bg-brand-surf px-3 py-2">
-        <button
-          type="button"
-          onClick={() => setTemplateModalOpen(true)}
-          className="rounded-lg border border-brand-border bg-brand-card px-3 py-1.5 text-xs text-brand-sub hover:text-brand-text"
-        >
-          Publish as Template
-        </button>
+        <div className="grid gap-2 md:grid-cols-3">
+          <button
+            type="button"
+            onClick={() => setTemplateModalOpen(true)}
+            className="rounded-lg border border-brand-border bg-brand-card px-3 py-1.5 text-xs text-brand-sub hover:text-brand-text"
+          >
+            Publish as Template
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              void saveProjectSettings();
+            }}
+            disabled={savingProjectSettings}
+            className="rounded-lg border border-brand-border bg-brand-card px-3 py-1.5 text-xs text-brand-sub hover:text-brand-text disabled:opacity-60"
+          >
+            {savingProjectSettings ? "Saving..." : "Save Project Settings"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              void inviteCollaborator();
+            }}
+            className="rounded-lg border border-brand-border bg-brand-card px-3 py-1.5 text-xs text-brand-sub hover:text-brand-text"
+          >
+            Invite Collaborator
+          </button>
+        </div>
+        <div className="mt-2 grid gap-2 md:grid-cols-2">
+          <textarea
+            value={projectInstructions}
+            maxLength={10000}
+            onChange={(event) => setProjectInstructions(event.target.value)}
+            rows={3}
+            placeholder="Project Instructions (persistent context for this project)"
+            className="w-full rounded-lg border border-brand-border bg-brand-card px-3 py-2 text-xs text-brand-text outline-none"
+          />
+          <div className="space-y-2">
+            <input
+              value={customDomain}
+              onChange={(event) => setCustomDomain(event.target.value)}
+              placeholder="Custom domain (e.g. myapp.com)"
+              className="w-full rounded-lg border border-brand-border bg-brand-card px-3 py-2 text-xs text-brand-text outline-none"
+            />
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  void saveCustomDomain();
+                }}
+                disabled={domainVerifying}
+                className="rounded-lg border border-brand-border bg-brand-card px-3 py-1.5 text-xs text-brand-sub hover:text-brand-text disabled:opacity-60"
+              >
+                {domainVerifying ? "Verifying..." : "Configure Domain"}
+              </button>
+              <label className="inline-flex items-center gap-2 rounded-lg border border-brand-border bg-brand-card px-3 py-1.5 text-xs text-brand-sub">
+                <input
+                  type="checkbox"
+                  checked={publicProject}
+                  onChange={(event) => setPublicProject(event.target.checked)}
+                  className="accent-brand-or"
+                />
+                Make Public
+              </label>
+              <input
+                value={collabInviteEmail}
+                onChange={(event) => setCollabInviteEmail(event.target.value)}
+                placeholder="Invite email"
+                className="min-w-0 flex-1 rounded-lg border border-brand-border bg-brand-card px-2 py-1.5 text-xs text-brand-text outline-none"
+              />
+              <select
+                value={collabInviteRole}
+                onChange={(event) =>
+                  setCollabInviteRole(event.target.value as "viewer" | "editor")
+                }
+                className="rounded-lg border border-brand-border bg-brand-card px-2 py-1.5 text-xs text-brand-sub outline-none"
+              >
+                <option value="viewer">viewer</option>
+                <option value="editor">editor</option>
+              </select>
+            </div>
+            {domainMessage ? (
+              <p className="text-[11px] text-brand-sub">{domainMessage}</p>
+            ) : null}
+          </div>
+        </div>
       </div>
       <div className="relative flex flex-1 overflow-hidden">
         {versionOpen ? (
@@ -1259,6 +1507,34 @@ export function StudioLayout({
                 className="rounded-lg bg-brand-gradient px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
               >
                 {apkBuilding ? "Starting..." : "Start Mock APK Build"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {domainModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-xl rounded-2xl border border-brand-border bg-brand-card p-5">
+            <h3 className="text-lg font-semibold">DNS Configuration Instructions</h3>
+            <p className="mt-2 text-sm text-brand-sub">
+              Add a CNAME record pointing your domain to{" "}
+              <code className="rounded bg-brand-card2 px-1 py-0.5">
+                cname.vercel-dns.com
+              </code>
+              . After DNS propagation, click Verify again.
+            </p>
+            {domainMessage ? (
+              <p className="mt-3 rounded-lg border border-brand-border bg-brand-card2 p-3 text-sm text-brand-text">
+                {domainMessage}
+              </p>
+            ) : null}
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setDomainModalOpen(false)}
+                className="rounded-lg border border-brand-border px-3 py-2 text-sm text-brand-sub"
+              >
+                Close
               </button>
             </div>
           </div>

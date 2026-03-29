@@ -56,6 +56,7 @@ create table if not exists public.user_settings (
   theme text not null default 'dark' check (theme in ('dark', 'light', 'system')),
   chat_mode text not null default 'chat_code' check (chat_mode in ('chat', 'chat_code', 'full_control')),
   hindi_mode boolean not null default false,
+  workspace_knowledge text not null default '',
   editor_font_size integer not null default 14,
   editor_tab_size integer not null default 2,
   editor_font_family text not null default 'JetBrains Mono',
@@ -98,6 +99,11 @@ create table if not exists public.projects (
   framework text not null default 'nextjs',
   status text not null default 'idle',
   github_url text,
+  github_full_name text,
+  vercel_project_id text,
+  project_instructions text not null default '',
+  custom_domain text,
+  is_public boolean not null default false,
   deployed_url text,
   branch_name text not null default 'main',
   created_at timestamptz not null default now(),
@@ -268,6 +274,16 @@ create table if not exists public.oauth_connections (
   unique (user_id, provider)
 );
 
+create table if not exists public.project_collaborators (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null references public.projects(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  role text not null check (role in ('viewer', 'editor')),
+  invited_by uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique (project_id, user_id)
+);
+
 create table if not exists public.template_reviews (
   id uuid primary key default gen_random_uuid(),
   template_id uuid not null references public.templates(id) on delete cascade,
@@ -401,6 +417,7 @@ alter table public.error_logs enable row level security;
 alter table public.sessions_log enable row level security;
 alter table public.oauth_connections enable row level security;
 alter table public.template_reviews enable row level security;
+alter table public.project_collaborators enable row level security;
 
 drop policy if exists "plans readable" on public.plans;
 create policy "plans readable" on public.plans
@@ -626,3 +643,24 @@ create policy "template reviews self write" on public.template_reviews
 for all to authenticated
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
+
+drop policy if exists "project collaborators owner manage" on public.project_collaborators;
+create policy "project collaborators owner manage" on public.project_collaborators
+for all to authenticated
+using (
+  exists (
+    select 1 from public.projects p
+    where p.id = project_id and p.user_id = auth.uid()
+  )
+)
+with check (
+  exists (
+    select 1 from public.projects p
+    where p.id = project_id and p.user_id = auth.uid()
+  )
+);
+
+drop policy if exists "project collaborators can view own rows" on public.project_collaborators;
+create policy "project collaborators can view own rows" on public.project_collaborators
+for select to authenticated
+using (user_id = auth.uid());

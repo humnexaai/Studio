@@ -13,3 +13,7 @@ export function estimateCredits(message: string, mode: "agent" | "plan"): number
   if (length <= 900) return 5;
   return 8;
 }
+
+export function estimateArenaCredits(message: string): number {
+  return estimateCredits(message, "agent") * 2;
+}

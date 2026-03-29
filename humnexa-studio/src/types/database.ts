@@ -50,6 +50,7 @@ export type Database = {
           theme: "dark" | "light" | "system";
           chat_mode: "chat" | "chat_code" | "full_control";
           hindi_mode: boolean;
+          workspace_knowledge?: string;
           editor_font_size: number;
           editor_tab_size: number;
           editor_font_family: string;
@@ -73,11 +74,15 @@ export type Database = {
           id: string;
           user_id: string;
           name: string;
+          description?: string | null;
           framework: string;
           status: string;
           github_url: string | null;
           github_full_name?: string | null;
           vercel_project_id?: string | null;
+          project_instructions?: string | null;
+          custom_domain?: string | null;
+          is_public?: boolean;
           deployed_url: string | null;
           branch_name?: string;
           created_at: string;
@@ -278,6 +283,24 @@ export type Database = {
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["oauth_connections"]["Row"]>;
+      };
+      project_collaborators: {
+        Row: {
+          id: string;
+          project_id: string;
+          user_id: string;
+          role: "viewer" | "editor";
+          invited_by: string;
+          created_at: string;
+        };
+        Insert: Omit<
+          Database["public"]["Tables"]["project_collaborators"]["Row"],
+          "id" | "created_at"
+        > & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["project_collaborators"]["Row"]>;
       };
     };
     Views: Record<string, never>;

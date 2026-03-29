@@ -9,6 +9,13 @@ const updateSchema = z.object({
   framework: z.string().min(2).max(40).optional(),
   githubUrl: z.string().url().optional(),
   deployedUrl: z.string().url().optional(),
+  projectInstructions: z.string().max(10000).optional(),
+  customDomain: z
+    .string()
+    .max(255)
+    .regex(/^[a-zA-Z0-9.-]+$/)
+    .optional(),
+  isPublic: z.boolean().optional(),
 });
 
 type Ctx = { params: { id: string } };
@@ -56,15 +63,25 @@ export async function PUT(req: NextRequest, { params }: Ctx): Promise<Response> 
     const body = await req.json();
     const validated = updateSchema.parse(body);
 
+    const updatePayload: Record<string, unknown> = {};
+    if (validated.name !== undefined) updatePayload.name = validated.name;
+    if (validated.status !== undefined) updatePayload.status = validated.status;
+    if (validated.framework !== undefined) updatePayload.framework = validated.framework;
+    if (validated.githubUrl !== undefined) updatePayload.github_url = validated.githubUrl;
+    if (validated.deployedUrl !== undefined) updatePayload.deployed_url = validated.deployedUrl;
+    if (validated.projectInstructions !== undefined) {
+      updatePayload.project_instructions = validated.projectInstructions;
+    }
+    if (validated.customDomain !== undefined) {
+      updatePayload.custom_domain = validated.customDomain || null;
+    }
+    if (validated.isPublic !== undefined) {
+      updatePayload.is_public = validated.isPublic;
+    }
+
     const { data, error } = await supabase
       .from("projects")
-      .update({
-        name: validated.name,
-        status: validated.status,
-        framework: validated.framework,
-        github_url: validated.githubUrl,
-        deployed_url: validated.deployedUrl,
-      })
+      .update(updatePayload)
       .eq("id", params.id)
       .eq("user_id", user.id)
       .select("*")

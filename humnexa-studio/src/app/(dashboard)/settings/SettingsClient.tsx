@@ -12,6 +12,7 @@ type SettingsData = {
   id: string;
   theme: ThemeMode;
   hindi_mode: boolean;
+  workspace_knowledge?: string;
   editor_font_size: number;
   editor_tab_size: number;
   editor_font_family: string;
@@ -31,6 +32,7 @@ type ProviderType = "github" | "google" | "vercel";
 type PatchPayload = Partial<{
   theme: ThemeMode;
   hindi_mode: boolean;
+  workspace_knowledge: string;
   editor_font_size: number;
   editor_tab_size: number;
   editor_font_family: string;
@@ -80,6 +82,9 @@ export default function SettingsClient({
     initialSettings.notifications_team,
   );
   const [hindiMode, setHindiMode] = useState(initialSettings.hindi_mode);
+  const [workspaceKnowledge, setWorkspaceKnowledge] = useState(
+    initialSettings.workspace_knowledge ?? "",
+  );
   const [toast, setToast] = useState<string | null>(null);
   const [oauthRows, setOauthRows] = useState<OauthConnection[]>(connections);
   const debounceRef = useRef<number | null>(null);
@@ -151,6 +156,10 @@ export default function SettingsClient({
       showToast("हिंदी मोड चालू है");
     }
   }, [hindiMode, setHindiModeStore, persistSettings]);
+
+  useEffect(() => {
+    persistSettings({ workspace_knowledge: workspaceKnowledge });
+  }, [workspaceKnowledge, persistSettings]);
 
   useEffect(() => {
     persistSettings({
@@ -354,6 +363,24 @@ export default function SettingsClient({
             />
             Hindi Mode
           </label>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-brand-border bg-brand-card p-5">
+        <h2 className="mb-2 font-medium">Workspace Knowledge</h2>
+        <p className="text-xs text-brand-sub">
+          Persistent instructions applied to AI prompts across all your projects.
+        </p>
+        <textarea
+          value={workspaceKnowledge}
+          maxLength={10000}
+          onChange={(event) => setWorkspaceKnowledge(event.target.value)}
+          placeholder="Add global context, coding standards, architecture notes, or business rules..."
+          rows={6}
+          className="mt-3 w-full rounded-xl border border-brand-border bg-brand-card2 px-3 py-2 text-sm outline-none"
+        />
+        <div className="mt-2 text-right text-[11px] text-brand-muted">
+          {workspaceKnowledge.length}/10000
         </div>
       </div>
 

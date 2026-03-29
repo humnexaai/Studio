@@ -11,6 +11,7 @@ type ProjectRow = {
   framework: string;
   status: string;
   updated_at: string;
+  is_public?: boolean;
 };
 
 type TransactionRow = {
@@ -94,6 +95,25 @@ export default function DashboardClient({
     router.refresh();
   };
 
+  const cloneProject = async (projectId: string): Promise<void> => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/clone`, {
+        method: "POST",
+      });
+      const payload = (await response.json()) as {
+        error?: string;
+        data?: { id?: string };
+      };
+      if (!response.ok || !payload.data?.id) {
+        throw new Error(payload.error ?? "Failed to clone project");
+      }
+      router.push(`/studio/${payload.data.id}`);
+      router.refresh();
+    } catch (cloneError) {
+      setError(cloneError instanceof Error ? cloneError.message : "Failed to clone project");
+    }
+  };
+
   return (
     <div className="space-y-6">
       <header className="flex items-start justify-between">
@@ -147,7 +167,11 @@ export default function DashboardClient({
                   name: project.name,
                   framework: project.framework,
                   status: project.status,
+                  is_public: Boolean(project.is_public),
                   updatedAt: new Date(project.updated_at).toLocaleString("en-IN"),
+                }}
+                onClone={() => {
+                  void cloneProject(project.id);
                 }}
               />
             ))}

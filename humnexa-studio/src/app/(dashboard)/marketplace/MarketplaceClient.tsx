@@ -27,6 +27,13 @@ type MyTemplate = {
   isActive: boolean;
 };
 
+type ExploreProject = {
+  id: string;
+  name: string;
+  framework: string;
+  createdAt: string;
+};
+
 const categories = [
   { label: "All", value: "all" },
   { label: "E-Commerce", value: "ecommerce" },
@@ -40,9 +47,11 @@ const categories = [
 export default function MarketplaceClient({
   templates,
   myTemplates,
+  exploreProjects,
 }: {
   templates: MarketplaceTemplate[];
   myTemplates: MyTemplate[];
+  exploreProjects: ExploreProject[];
 }): React.ReactElement {
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -232,6 +241,41 @@ export default function MarketplaceClient({
                     {template.rating.toFixed(1)} rating
                   </span>
                 </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-xl font-semibold">Explore Public Projects</h2>
+        {exploreProjects.length === 0 ? (
+          <div className="rounded-2xl border border-brand-border bg-brand-card p-4 text-sm text-brand-sub">
+            No public projects available yet.
+          </div>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2">
+            {exploreProjects.map((project) => (
+              <article
+                key={project.id}
+                className="rounded-2xl border border-brand-border bg-brand-card p-4"
+              >
+                <h3 className="font-semibold">{project.name}</h3>
+                <div className="mt-2 flex items-center gap-2 text-xs text-brand-muted">
+                  <span className="rounded bg-brand-card2 px-2 py-1">
+                    {project.framework}
+                  </span>
+                  <span className="rounded bg-brand-card2 px-2 py-1">
+                    {new Date(project.createdAt).toLocaleDateString("en-IN")}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => router.push(`/projects/${project.id}`)}
+                  className="mt-4 w-full rounded-xl border border-brand-border bg-brand-card2 px-3 py-2 text-sm text-brand-sub hover:text-brand-text"
+                >
+                  View Project
+                </button>
               </article>
             ))}
           </div>
