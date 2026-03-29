@@ -28,4 +28,4 @@ function QuickChipsComponent({
   );
 }
 
-export const QuickChips = memo(QuickChipsComponent);
+export default memo(QuickChipsComponent);

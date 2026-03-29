@@ -7,6 +7,7 @@ import { extractCodeDiffs } from "@/lib/ai/extract-diffs";
 import { routeAI } from "@/lib/ai/router";
 import { deductCreditsOnSuccess } from "@/lib/credits/deduct";
 import { estimateCredits } from "@/lib/credits/estimate";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 const schema = z.object({
   projectId: z.string().uuid(),
@@ -108,18 +109,48 @@ export async function POST(req: Request): Promise<Response> {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("plan_id")
+      .eq("id", user.id)
+      .maybeSingle();
+    const typedProfile = profile as { plan_id?: string | null } | null;
+
+    let planCode: string | null = null;
+    if (typedProfile?.plan_id) {
+      const { data: plan } = await supabase
+        .from("plans")
+        .select("code")
+        .eq("id", typedProfile.plan_id)
+        .maybeSingle();
+      const typedPlan = plan as { code?: string | null } | null;
+      planCode = typedPlan?.code ?? null;
+    }
+
+    const limit = planCode === "pro" ? 300 : 60;
+    const rate = checkRateLimit(user.id, limit, 60_000);
+    if (!rate.success) {
+      return Response.json(
+        {
+          error: "Rate limit exceeded. Please wait before retrying",
+          retryAfter: 60,
+        },
+        { status: 429 },
+      );
+    }
+
     const parsed = schema.parse(await req.json());
     const planMode = parsed.planMode ?? parsed.mode === "plan";
     const estimatedCost = planMode ? 0 : estimateCredits(parsed.message, "agent");
 
     if (!planMode) {
-      const { data: profile } = await supabase
+      const { data: creditProfile } = await supabase
         .from("profiles")
         .select("credits_balance")
         .eq("id", user.id)
         .single();
-      const typedProfile = profile as { credits_balance?: number | null } | null;
-      const balance = typedProfile?.credits_balance ?? 0;
+      const typedCreditProfile = creditProfile as { credits_balance?: number | null } | null;
+      const balance = typedCreditProfile?.credits_balance ?? 0;
       if (balance < estimatedCost) {
         return Response.json(
           {
@@ -205,9 +236,12 @@ export async function POST(req: Request): Promise<Response> {
             : extractCodeDiffs(accumulatedText, parsed.currentFiles);
 
           if (parsed.conversationId && !planMode) {
-            await dbWriter.from("conversations").update?.({
-              updated_at: new Date().toISOString(),
-            }).eq("id", parsed.conversationId);
+            await dbWriter
+              .from("conversations")
+              .update?.({
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", parsed.conversationId);
           }
 
           await saveMessage(
@@ -219,26 +253,17 @@ export async function POST(req: Request): Promise<Response> {
           );
 
           if (!planMode && estimatedCost > 0) {
-            await deductCreditsOnSuccess(
-              user.id,
-              estimatedCost,
-              "AI generation success",
-            );
+            await deductCreditsOnSuccess(user.id, estimatedCost, "AI generation success");
           }
 
           if (diffs.length > 0) {
             controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({ diffs })}\n\n`,
-              ),
+              encoder.encode(`data: ${JSON.stringify({ diffs })}\n\n`),
             );
           }
+
           controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                provider,
-              })}\n\n`,
-            ),
+            encoder.encode(`data: ${JSON.stringify({ provider })}\n\n`),
           );
 
           controller.enqueue(

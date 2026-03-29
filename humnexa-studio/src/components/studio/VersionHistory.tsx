@@ -52,4 +52,4 @@ function VersionHistoryComponent({
   );
 }
 
-export const VersionHistory = memo(VersionHistoryComponent);
+export default memo(VersionHistoryComponent);

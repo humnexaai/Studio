@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import {
   createRepo,
@@ -136,6 +137,7 @@ export async function POST(
       pushedFiles: files.length,
     });
   } catch (error) {
+    Sentry.captureException(error);
     return NextResponse.json(
       {
         error:

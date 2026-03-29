@@ -354,4 +354,4 @@ function ContextAction({
   );
 }
 
-export const FileTree = memo(FileTreeComponent);
+export default memo(FileTreeComponent);

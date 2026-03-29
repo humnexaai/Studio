@@ -3,7 +3,7 @@
 import { Mic, Send, ShieldAlert } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { PlanModeToggle } from "@/components/studio/PlanModeToggle";
-import { QuickChips } from "@/components/studio/QuickChips";
+import QuickChips from "@/components/studio/QuickChips";
 import { CostPreview } from "@/components/ui/CostPreview";
 
 type ChatInputProps = {

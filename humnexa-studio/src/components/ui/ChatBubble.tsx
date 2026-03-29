@@ -46,4 +46,4 @@ function ChatBubbleComponent({
   );
 }
 
-export const ChatBubble = memo(ChatBubbleComponent);
+export default memo(ChatBubbleComponent);

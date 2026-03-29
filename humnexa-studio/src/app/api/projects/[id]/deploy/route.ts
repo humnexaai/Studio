@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import {
   createRepo,
@@ -425,6 +426,7 @@ export async function POST(
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();
         } catch (error) {
+          Sentry.captureException(error);
           if (deploymentRowId) {
             await db
               .from("deployments")

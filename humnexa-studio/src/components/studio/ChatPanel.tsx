@@ -4,9 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { nanoid } from "nanoid";
 import { useChatStore } from "@/store/chatStore";
-import { ChatBubble } from "@/components/ui/ChatBubble";
+import ChatBubble from "@/components/ui/ChatBubble";
 import { TypingIndicator } from "@/components/ui/TypingIndicator";
-import { DiffCard } from "@/components/ui/DiffCard";
+import DiffCard from "@/components/ui/DiffCard";
 import { PromptQueue } from "@/components/studio/PromptQueue";
 import { ChatInput } from "@/components/studio/ChatInput";
 import { CreditConfirmModal } from "@/components/studio/CreditConfirmModal";
@@ -190,7 +190,12 @@ export function ChatPanel({
     try {
       await runPrompt(value, mode);
     } catch (error) {
-      setErrorToast(error instanceof Error ? error.message : "Failed to send message");
+      const err = error as Error & { statusCode?: number };
+      if (err.statusCode === 429) {
+        setErrorToast("You are sending too many requests. Please wait 60 seconds.");
+      } else {
+        setErrorToast(error instanceof Error ? error.message : "Failed to send message");
+      }
       window.setTimeout(() => setErrorToast(null), 2600);
     }
   };

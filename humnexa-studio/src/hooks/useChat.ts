@@ -40,7 +40,13 @@ export function useChat() {
 
       if (!response.ok || !response.body) {
         removeLastUserMessage();
-        throw new Error("Unable to stream response");
+        const payload = (await response.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        const message = payload.error ?? "Unable to stream response";
+        const error = new Error(message) as Error & { statusCode?: number };
+        error.statusCode = response.status;
+        throw error;
       }
 
       const reader = response.body.getReader();

@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { nanoid } from "nanoid";
-import { FileTree } from "@/components/studio/FileTree";
+import FileTree from "@/components/studio/FileTree";
 import { ChatPanel } from "@/components/studio/ChatPanel";
 import { CodePanel } from "@/components/studio/CodePanel";
 import { PreviewPanel } from "@/components/studio/PreviewPanel";
 import { StudioNavbar } from "@/components/studio/StudioNavbar";
 import { ResizeDivider } from "@/components/studio/ResizeDivider";
-import { VersionHistory } from "@/components/studio/VersionHistory";
+import VersionHistory from "@/components/studio/VersionHistory";
 import { StatusBar } from "@/components/studio/StatusBar";
 import { DeployModal } from "@/components/deploy/DeployModal";
 import { PanelErrorBoundary } from "@/components/ui/PanelErrorBoundary";

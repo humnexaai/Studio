@@ -60,4 +60,4 @@ function DiffCardComponent({
   );
 }
 
-export const DiffCard = memo(DiffCardComponent);
+export default memo(DiffCardComponent);

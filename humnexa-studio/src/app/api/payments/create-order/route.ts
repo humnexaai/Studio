@@ -1,6 +1,7 @@
 import { z, ZodError } from "zod";
 import * as Sentry from "@sentry/nextjs";
 import { createSupabaseServer } from "@/lib/supabase/server";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 const schema = z.object({
   planId: z.string().uuid(),
@@ -33,6 +34,17 @@ export async function POST(request: Request): Promise<Response> {
 
     if (authError || !user) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const paymentRate = checkRateLimit(user.id, 10, 60_000);
+    if (!paymentRate.success) {
+      return Response.json(
+        {
+          error: "Rate limit exceeded. Please wait before retrying",
+          retryAfter: 60,
+        },
+        { status: 429 },
+      );
     }
 
     const body = await request.json();

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z, ZodError } from "zod";
+import * as Sentry from "@sentry/nextjs";
 import { createSupabaseServer } from "@/lib/supabase/server";
 
 const schema = z.object({
@@ -70,6 +71,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (error instanceof ZodError) {
       return NextResponse.json({ error: "Validation failed" }, { status: 400 });
     }
+    Sentry.captureException(error);
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Unable to connect Vercel",
