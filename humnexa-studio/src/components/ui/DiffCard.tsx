@@ -1,3 +1,5 @@
+import { memo } from "react";
+
 type DiffCardProps = {
   filePath: string;
   summary: string;
@@ -5,7 +7,7 @@ type DiffCardProps = {
   after?: string;
 };
 
-export function DiffCard({
+function DiffCardComponent({
   filePath,
   summary,
   before = "",
@@ -57,3 +59,5 @@ export function DiffCard({
     </details>
   );
 }
+
+export const DiffCard = memo(DiffCardComponent);

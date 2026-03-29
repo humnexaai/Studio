@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { RotateCcw, Star } from "lucide-react";
 
 type VersionItem = {
@@ -14,7 +15,7 @@ type VersionHistoryProps = {
   onRestore: (versionId: string) => void;
 };
 
-export function VersionHistory({
+function VersionHistoryComponent({
   versions,
   onRestore,
 }: VersionHistoryProps): React.ReactElement {
@@ -50,3 +51,5 @@ export function VersionHistory({
     </aside>
   );
 }
+
+export const VersionHistory = memo(VersionHistoryComponent);

@@ -1,3 +1,5 @@
+import { memo } from "react";
+
 const chips = [
   "Add dark mode",
   "Fix errors",
@@ -6,7 +8,7 @@ const chips = [
   "Add GST invoice",
 ];
 
-export function QuickChips({
+function QuickChipsComponent({
   onSelect,
 }: {
   onSelect: (value: string) => void;
@@ -25,3 +27,5 @@ export function QuickChips({
     </div>
   );
 }
+
+export const QuickChips = memo(QuickChipsComponent);

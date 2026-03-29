@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type MarketplaceTemplate = {
@@ -46,13 +46,29 @@ export default function MarketplaceClient({
 }): React.ReactElement {
   const router = useRouter();
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [category, setCategory] =
     useState<(typeof categories)[number]["value"]>("all");
   const [creatingTemplateId, setCreatingTemplateId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const scheduleSearch = useCallback((value: string) => {
+    const handle = window.setTimeout(() => {
+      setDebouncedSearch(value);
+    }, 300);
+
+    return () => {
+      window.clearTimeout(handle);
+    };
+  }, []);
+
+  useEffect(() => {
+    const clear = scheduleSearch(search);
+    return clear;
+  }, [scheduleSearch, search]);
+
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = debouncedSearch.trim().toLowerCase();
     return templates.filter((template) => {
       const matchesSearch =
         !q ||
@@ -66,7 +82,7 @@ export default function MarketplaceClient({
             : template.category.toLowerCase() === category;
       return matchesSearch && matchesCategory;
     });
-  }, [templates, search, category]);
+  }, [templates, debouncedSearch, category]);
 
   const applyTemplate = async (template: MarketplaceTemplate): Promise<void> => {
     if (template.priceInr > 0) {

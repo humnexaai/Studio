@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { cn } from "@/lib/utils";
 import type { ChatMessage } from "@/types/studio";
 
@@ -8,7 +9,7 @@ interface ChatBubbleProps {
   onImplementPlan?: (prompt: string) => void;
 }
 
-export function ChatBubble({
+function ChatBubbleComponent({
   message,
   onImplementPlan,
 }: ChatBubbleProps): React.ReactElement {
@@ -44,3 +45,5 @@ export function ChatBubble({
     </div>
   );
 }
+
+export const ChatBubble = memo(ChatBubbleComponent);

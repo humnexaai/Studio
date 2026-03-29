@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import {
   ChevronRight,
   Copy,
@@ -38,7 +38,7 @@ type FileTreeProps = {
   onDuplicateFile?: (path: string) => void;
 };
 
-export function FileTree({
+function FileTreeComponent({
   files,
   folders = [],
   activeFile,
@@ -353,3 +353,5 @@ function ContextAction({
     </button>
   );
 }
+
+export const FileTree = memo(FileTreeComponent);

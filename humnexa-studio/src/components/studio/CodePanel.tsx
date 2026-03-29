@@ -1,7 +1,12 @@
 "use client";
 
-import Editor from "@monaco-editor/react";
+import dynamic from "next/dynamic";
 import { useUserStore } from "@/store/userStore";
+
+const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
+  ssr: false,
+  loading: () => <div className="h-full w-full rounded-none bg-[#111827]" />,
+});
 
 interface CodePanelProps {
   path: string;
@@ -46,7 +51,7 @@ export function CodePanel({
           ))}
         </div>
       ) : (
-        <Editor
+        <MonacoEditor
           height="calc(100% - 38px)"
           language={language}
           theme="vs-dark"
