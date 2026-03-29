@@ -21,6 +21,8 @@ type ChatPanelProps = {
   conversationId: string | null;
   initialMessages: ReturnType<typeof useChatStore.getState>["messages"];
   currentFiles: ProjectFile[];
+  mobileView?: boolean;
+  onLongPressToggleModeMenu?: () => void;
   autoApply: boolean;
   onAutoApplyChange: (enabled: boolean) => void;
   selectedElement: SelectedElementContext | null;
@@ -33,6 +35,8 @@ export function ChatPanel({
   conversationId,
   initialMessages,
   currentFiles,
+  mobileView = false,
+  onLongPressToggleModeMenu,
   autoApply,
   onAutoApplyChange,
   selectedElement,
@@ -308,6 +312,8 @@ export function ChatPanel({
           onSubmit={(value) => void handleSubmit(value)}
           planMode={planMode}
           onPlanModeChange={setPlanMode}
+          mobileView={mobileView}
+          onLongPressToggleModeMenu={onLongPressToggleModeMenu}
           hindiMode={hindiMode}
           disabled={inputBlocked}
         />

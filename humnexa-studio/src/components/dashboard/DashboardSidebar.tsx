@@ -26,7 +26,7 @@ export function DashboardSidebar({
   planLimit,
 }: DashboardSidebarProps): React.ReactElement {
   return (
-    <aside className="flex h-screen w-[220px] flex-col border-r border-brand-border bg-brand-surf p-4">
+    <aside className="flex h-full w-[220px] flex-col border-r border-brand-border bg-brand-surf p-4 md:h-screen">
       <div className="flex items-center justify-between">
         <Logo />
         <NotificationsBell userId={userId} compact />

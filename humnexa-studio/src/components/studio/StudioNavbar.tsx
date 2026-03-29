@@ -20,6 +20,7 @@ type StudioNavbarProps = {
   credits: number;
   collaboratorsCount?: number;
   collaboratorsSlot?: React.ReactNode;
+  onShareProject?: () => void;
   statusText?: string;
   onDeploy?: () => void;
   onPush?: () => void;
@@ -41,6 +42,7 @@ export function StudioNavbar({
   credits,
   collaboratorsCount = 0,
   collaboratorsSlot = null,
+  onShareProject,
   statusText = "Ready to build",
   onDeploy,
   onPush,
@@ -83,6 +85,15 @@ export function StudioNavbar({
           👥 {collaboratorsCount}
         </button>
         {collaboratorsSlot}
+        {onShareProject ? (
+          <button
+            type="button"
+            onClick={onShareProject}
+            className="rounded-lg border border-brand-border bg-brand-card px-2 py-1 text-xs text-brand-sub transition hover:text-brand-text"
+          >
+            Share Project
+          </button>
+        ) : null}
         <NotificationsBell userId={userId} compact />
         <span className="inline-flex items-center gap-1 rounded-md border border-brand-border bg-brand-card px-2 py-1 text-xs text-brand-text">
           <Coins className="h-3.5 w-3.5 text-brand-or" />

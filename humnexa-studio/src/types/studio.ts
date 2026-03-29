@@ -60,7 +60,7 @@ export type QueueItem = {
   createdAt: string;
 };
 
-export type StudioTab = "chat" | "code" | "tests";
+export type StudioTab = "chat" | "code" | "tests" | "preview" | "files";
 
 export type StudioPanelState = {
   chatWidth: number;
@@ -68,6 +68,8 @@ export type StudioPanelState = {
   chatCollapsed: boolean;
   previewCollapsed: boolean;
   activeTab: StudioTab;
+  mobileTab: "chat" | "preview" | "files";
+  mobilePlanMenuOpen: boolean;
   previewDevice: PreviewDevice;
   planMode: boolean;
   autoApply: boolean;

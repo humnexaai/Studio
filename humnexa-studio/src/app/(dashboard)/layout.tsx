@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar";
+import MobileDashboardShell from "@/components/dashboard/MobileDashboardShell";
 import { createSupabaseServer } from "@/lib/supabase/server";
 
 export default function DashboardLayout({
@@ -46,13 +47,22 @@ async function renderDashboardLayout(
   }
 
   return (
-    <div className="flex min-h-screen bg-brand-bg">
-      <DashboardSidebar
-        userId={user.id}
-        creditBalance={typedProfile?.credits_balance ?? 0}
-        planLimit={planLimit}
-      />
-      <main className="flex-1 p-6">{children}</main>
+    <div className="min-h-screen bg-brand-bg md:flex">
+      <div className="hidden md:block">
+        <DashboardSidebar
+          userId={user.id}
+          creditBalance={typedProfile?.credits_balance ?? 0}
+          planLimit={planLimit}
+        />
+      </div>
+      <div className="md:hidden">
+        <MobileDashboardShell
+          userId={user.id}
+          creditBalance={typedProfile?.credits_balance ?? 0}
+          planLimit={planLimit}
+        />
+      </div>
+      <main className="flex-1 p-4 md:p-6">{children}</main>
     </div>
   );
 }

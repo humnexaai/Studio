@@ -22,6 +22,21 @@ import { detectLanguageFromPath } from "@/lib/studio/file-utils";
 import { estimateCredits } from "@/lib/credits/estimate";
 import type { ProjectFile } from "@/types/studio";
 
+function useIsMobile(): boolean {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const media = window.matchMedia("(max-width: 767px)");
+    const update = (): void => setIsMobile(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+
+  return isMobile;
+}
+
 type DeployStreamEvent =
   | {
       type: "step";
@@ -131,6 +146,7 @@ export function StudioLayout({
   initialMessages,
   initialVersions,
 }: StudioLayoutProps): React.ReactElement {
+  const isMobile = useIsMobile();
   const router = useRouter();
   const [files, setFiles] = useState<ProjectFile[]>(initialFiles);
   const [activeFilePath, setActiveFilePath] = useState<string | null>(
@@ -195,6 +211,7 @@ export function StudioLayout({
   const [collabInviteRole, setCollabInviteRole] = useState<"viewer" | "editor">(
     "viewer",
   );
+  const [mobileTab, setMobileTab] = useState<"chat" | "preview" | "files">("chat");
   const desktopNotifiedRef = useRef<string[]>([]);
   const pushTimeoutRef = useRef<number | null>(null);
   const saveTimeoutRef = useRef<Record<string, number>>({});
@@ -213,7 +230,29 @@ export function StudioLayout({
     setPlanMode,
     autoApply,
     setAutoApply,
+    setMobilePlanMenuOpen,
+    mobilePlanMenuOpen,
   } = useStudioStore();
+
+  useEffect(() => {
+    if (!isMobile) {
+      setMobilePlanMenuOpen(false);
+      return;
+    }
+    if (chatCollapsed) {
+      toggleChatCollapsed();
+    }
+    if (previewCollapsed) {
+      togglePreviewCollapsed();
+    }
+  }, [
+    chatCollapsed,
+    isMobile,
+    previewCollapsed,
+    setMobilePlanMenuOpen,
+    toggleChatCollapsed,
+    togglePreviewCollapsed,
+  ]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1110,6 +1149,18 @@ export function StudioLayout({
         onOpenArena={openArenaMode}
         collaboratorsCount={collaborators.length}
         collaboratorsSlot={null}
+        onShareProject={() => {
+          if (typeof window === "undefined") return;
+          const shareUrl = `${window.location.origin}/projects/${projectId}`;
+          void navigator.clipboard.writeText(shareUrl).then(() => {
+            setToastTone("success");
+            setPushToast("Share link copied.");
+            if (pushTimeoutRef.current) {
+              window.clearTimeout(pushTimeoutRef.current);
+            }
+            pushTimeoutRef.current = window.setTimeout(() => setPushToast(null), 2200);
+          });
+        }}
       />
       <div className="border-b border-brand-border bg-brand-surf px-3 py-2">
         <div className="grid gap-2 md:grid-cols-3">
@@ -1199,7 +1250,7 @@ export function StudioLayout({
           </div>
         </div>
       </div>
-      <div className="relative flex flex-1 overflow-hidden">
+      <div className="relative flex flex-1 overflow-hidden pb-14 md:pb-0">
         {versionOpen ? (
           <VersionHistory
             versions={versions}
@@ -1209,7 +1260,11 @@ export function StudioLayout({
           />
         ) : null}
 
-        <aside className="w-[210px] border-r border-brand-border">
+        <aside
+          className={`w-[210px] border-r border-brand-border ${
+            isMobile ? "hidden" : ""
+          }`}
+        >
           <PanelErrorBoundary panelName="FileTree">
             <FileTree
               files={filePaths}
@@ -1232,7 +1287,11 @@ export function StudioLayout({
           </PanelErrorBoundary>
         </aside>
 
-        <section className="flex min-w-0 flex-1">
+        <section
+          className={`flex min-w-0 flex-1 ${
+            isMobile && mobileTab !== "chat" ? "hidden" : ""
+          }`}
+        >
           <div
             className={`${chatCollapsed ? "w-10" : ""} border-r border-brand-border`}
             style={chatCollapsed ? undefined : { width: chatWidth }}
@@ -1252,6 +1311,8 @@ export function StudioLayout({
                   conversationId={initialConversationId}
                   initialMessages={initialMessages}
                   currentFiles={files}
+                  mobileView={isMobile}
+                  onLongPressToggleModeMenu={() => setMobilePlanMenuOpen(true)}
                   autoApply={autoApply}
                   onAutoApplyChange={setAutoApply}
                   selectedElement={null}
@@ -1305,10 +1366,12 @@ export function StudioLayout({
           </div>
         </section>
 
-        {!previewCollapsed ? <ResizeDivider /> : null}
+        {!previewCollapsed && !isMobile ? <ResizeDivider /> : null}
 
         <aside
-          className={`${previewCollapsed ? "w-10" : ""} border-l border-brand-border`}
+          className={`${previewCollapsed ? "w-10" : ""} border-l border-brand-border ${
+            isMobile && mobileTab !== "preview" ? "hidden" : ""
+          }`}
           style={previewCollapsed ? undefined : { width: previewWidth }}
         >
           {previewCollapsed ? (
@@ -1330,6 +1393,85 @@ export function StudioLayout({
           )}
         </aside>
       </div>
+      {isMobile ? (
+        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-brand-border bg-brand-card/95 backdrop-blur md:hidden">
+          <div className="grid grid-cols-3">
+            <button
+              type="button"
+              onClick={() => {
+                setMobileTab("chat");
+                setActiveTab("chat");
+              }}
+              className={`px-3 py-2 text-xs ${
+                mobileTab === "chat" ? "text-brand-or" : "text-brand-sub"
+              }`}
+            >
+              Chat
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMobileTab("preview");
+                setActiveTab("code");
+              }}
+              className={`px-3 py-2 text-xs ${
+                mobileTab === "preview" ? "text-brand-or" : "text-brand-sub"
+              }`}
+            >
+              Preview
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMobileTab("files");
+                setActiveTab("code");
+              }}
+              className={`px-3 py-2 text-xs ${
+                mobileTab === "files" ? "text-brand-or" : "text-brand-sub"
+              }`}
+            >
+              Files
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {isMobile && mobileTab === "files" ? (
+        <div className="fixed inset-0 z-50 bg-black/60 md:hidden">
+          <div className="absolute inset-0 top-14 overflow-auto bg-brand-surf">
+            <div className="flex items-center justify-between border-b border-brand-border px-3 py-2">
+              <p className="text-sm font-semibold">Files</p>
+              <button
+                type="button"
+                onClick={() => setMobileTab("chat")}
+                className="rounded-md border border-brand-border px-2 py-1 text-xs text-brand-sub"
+              >
+                Close
+              </button>
+            </div>
+            <FileTree
+              files={filePaths}
+              activeFile={activeFilePath}
+              onSelect={(path) => {
+                handleSelectFile(path);
+                setMobileTab("chat");
+              }}
+              onCreateFile={(path) => {
+                void createFileAtPath(path);
+              }}
+              onCreateFolder={createFolderAtPath}
+              onRenameFile={(oldPath, newPath) => {
+                void renameFilePath(oldPath, newPath);
+              }}
+              onDeleteFile={(path) => {
+                void deleteFilePath(path);
+              }}
+              onDuplicateFile={(path) => {
+                void duplicateFilePath(path);
+              }}
+            />
+          </div>
+        </div>
+      ) : null}
       <StatusBar
         branchName={initialProjectMeta.branchName}
         errorCount={monacoErrorCount}
@@ -1537,6 +1679,42 @@ export function StudioLayout({
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      ) : null}
+      {isMobile && mobilePlanMenuOpen ? (
+        <div className="fixed inset-0 z-[60] flex items-end bg-black/50 md:hidden">
+          <div className="w-full rounded-t-2xl border border-brand-border bg-brand-card p-4">
+            <p className="text-sm font-semibold">Send mode</p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setPlanMode(true);
+                  setMobilePlanMenuOpen(false);
+                }}
+                className="rounded-lg border border-brand-border px-3 py-2 text-sm text-brand-sub"
+              >
+                Plan
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPlanMode(false);
+                  setMobilePlanMenuOpen(false);
+                }}
+                className="rounded-lg bg-brand-gradient px-3 py-2 text-sm font-semibold text-white"
+              >
+                Build
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setMobilePlanMenuOpen(false)}
+              className="mt-3 w-full rounded-lg border border-brand-border px-3 py-2 text-xs text-brand-sub"
+            >
+              Close
+            </button>
           </div>
         </div>
       ) : null}
