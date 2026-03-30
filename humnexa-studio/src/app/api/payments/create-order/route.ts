@@ -41,9 +41,14 @@ export async function POST(request: Request): Promise<Response> {
       return Response.json(
         {
           error: "Rate limit exceeded. Please wait before retrying",
-          retryAfter: 60,
+          retryAfter: paymentRate.retryAfter,
         },
-        { status: 429 },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(paymentRate.retryAfter),
+          },
+        },
       );
     }
 

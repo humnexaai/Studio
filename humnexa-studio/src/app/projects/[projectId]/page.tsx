@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServer } from "@/lib/supabase/server";
@@ -6,6 +7,10 @@ type Props = {
   params: {
     projectId: string;
   };
+};
+
+export const metadata: Metadata = {
+  title: "Public Project",
 };
 
 export default async function PublicProjectPage({

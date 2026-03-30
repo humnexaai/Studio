@@ -1,30 +1,81 @@
 import type { MetadataRoute } from "next";
 
 export default function sitemap(): MetadataRoute.Sitemap {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://studio.humnexa.com";
+  const now = new Date();
+
   return [
     {
-      url: "https://studio.humnexa.com/",
-      lastModified: new Date(),
+      url: `${baseUrl}/`,
+      lastModified: now,
       changeFrequency: "daily",
       priority: 1,
     },
     {
-      url: "https://studio.humnexa.com/india",
-      lastModified: new Date(),
+      url: `${baseUrl}/india`,
+      lastModified: now,
       changeFrequency: "weekly",
       priority: 0.8,
     },
     {
-      url: "https://studio.humnexa.com/auth",
-      lastModified: new Date(),
+      url: `${baseUrl}/auth`,
+      lastModified: now,
       changeFrequency: "weekly",
       priority: 0.7,
     },
     {
-      url: "https://studio.humnexa.com/marketplace",
-      lastModified: new Date(),
+      url: `${baseUrl}/marketplace`,
+      lastModified: now,
       changeFrequency: "daily",
       priority: 0.9,
+    },
+    {
+      url: `${baseUrl}/pricing`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/features`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/vs/lovable`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/vs/bolt`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/terms`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.6,
+    },
+    {
+      url: `${baseUrl}/privacy`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.6,
+    },
+    {
+      url: `${baseUrl}/refund`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.6,
+    },
+    {
+      url: `${baseUrl}/grievance`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.6,
     },
   ];
 }

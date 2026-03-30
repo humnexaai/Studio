@@ -12,6 +12,7 @@ type SettingsRow = {
   theme: "dark" | "light" | "system";
   hindi_mode: boolean;
   workspace_knowledge?: string;
+  low_bandwidth_mode?: boolean;
   editor_font_size: number;
   editor_tab_size: number;
   editor_font_family: string;
@@ -31,6 +32,7 @@ const defaultSettings: SettingsRow = {
   theme: "dark",
   hindi_mode: false,
   workspace_knowledge: "",
+  low_bandwidth_mode: false,
   editor_font_size: 14,
   editor_tab_size: 2,
   editor_font_family: "JetBrains Mono",
@@ -52,7 +54,7 @@ export default async function SettingsPage(): Promise<React.ReactElement> {
     supabase
       .from("user_settings")
       .select(
-        "id,theme,hindi_mode,workspace_knowledge,editor_font_size,editor_tab_size,editor_font_family,notifications_deploy,notifications_credits,notifications_team",
+        "id,theme,hindi_mode,workspace_knowledge,low_bandwidth_mode,editor_font_size,editor_tab_size,editor_font_family,notifications_deploy,notifications_credits,notifications_team",
       )
       .eq("id", user.id)
       .maybeSingle(),

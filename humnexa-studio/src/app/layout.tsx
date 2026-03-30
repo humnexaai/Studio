@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { Providers } from "@/components/providers/Providers";
+import WebVitalsReporter from "@/components/analytics/WebVitalsReporter";
 
 const defaultTitle = "Humnexa Studio - India's First AI App Builder";
 const defaultDescription =
-  "Build any app with AI in minutes. UPI payments, Hindi support, 40+ languages. India first.";
+  "Build any app with AI. UPI payments Hindi support 40 plus languages. India first.";
+const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://studio.humnexa.com";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://studio.humnexa.com"),
+  metadataBase: new URL(appUrl),
   title: {
     default: defaultTitle,
     template: "%s | Humnexa Studio",
@@ -20,11 +23,25 @@ export const metadata: Metadata = {
     "hindi",
     "lovable alternative",
     "no code",
+    "bolt alternative",
+    "replit alternative",
+    "india stack",
+    "razorpay subscriptions",
+    "gst billing app",
+    "whatsapp integration",
+    "upi autopay",
+    "ai website builder india",
+    "ai mobile app builder",
+    "nextjs supabase starter",
+    "no code india",
+    "vibe coding india",
+    "humnexa studio",
+    "developer app platform",
   ],
   openGraph: {
     type: "website",
     locale: "en_IN",
-    url: "https://studio.humnexa.com",
+    url: appUrl,
     siteName: "Humnexa Studio",
     title: defaultTitle,
     description: defaultDescription,
@@ -42,6 +59,10 @@ export const metadata: Metadata = {
     title: defaultTitle,
     description: defaultDescription,
     images: ["/og-image.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
   },
 };
 
@@ -61,9 +82,14 @@ export default function RootLayout({
         />
         <meta name="apple-mobile-web-app-title" content="Humnexa Studio" />
         <link rel="manifest" href="/manifest.json" />
+        <link rel="alternate" hrefLang="en-IN" href={appUrl} />
+        <link rel="alternate" hrefLang="hi-IN" href={appUrl} />
       </head>
       <body className="bg-brand-bg font-body text-brand-text antialiased">
-        {children}
+        <Providers>
+          <WebVitalsReporter />
+          {children}
+        </Providers>
       </body>
     </html>
   );

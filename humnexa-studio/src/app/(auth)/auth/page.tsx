@@ -19,7 +19,7 @@ const authSchema = z.object({
 
 type AuthFormValues = z.infer<typeof authSchema>;
 
-type AuthTab = "signup" | "signin";
+type AuthTab = "signup" | "signin" | "reset";
 
 export default function AuthPage(): React.ReactElement {
   const router = useRouter();
@@ -28,6 +28,7 @@ export default function AuthPage(): React.ReactElement {
   const [formLoading, setFormLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [honeypot, setHoneypot] = useState("");
 
   const {
     register,
@@ -73,21 +74,46 @@ export default function AuthPage(): React.ReactElement {
     setFormLoading(true);
 
     if (tab === "signup") {
-      const { error } = await supabase.auth.signUp({
-        email: values.email,
-        password: values.password,
-        options: {
+      const signupResponse = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: values.email,
+          password: values.password,
+          honeypot,
           emailRedirectTo: oauthRedirectTo,
-        },
+        }),
       });
+      const signupPayload = (await signupResponse.json()) as { error?: string };
 
-      if (error) {
-        setAuthError(error.message);
+      if (!signupResponse.ok) {
+        setAuthError(signupPayload.error ?? "Failed to create account");
         setFormLoading(false);
         return;
       }
 
       setStatusMessage("Check your email to confirm your account.");
+      setFormLoading(false);
+      return;
+    }
+
+    if (tab === "reset") {
+      const resetResponse = await fetch("/api/auth/password-reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: values.email,
+          honeypot,
+        }),
+      });
+      const resetPayload = (await resetResponse.json()) as { error?: string };
+      if (!resetResponse.ok) {
+        setAuthError(resetPayload.error ?? "Failed to send reset email");
+        setFormLoading(false);
+        return;
+      }
+
+      setStatusMessage("Password reset link sent. Check your inbox.");
       setFormLoading(false);
       return;
     }
@@ -113,7 +139,7 @@ export default function AuthPage(): React.ReactElement {
         <div className="mb-6 flex justify-center">
           <Logo />
         </div>
-        <div className="mb-4 grid grid-cols-2 gap-2 rounded-xl bg-brand-surf p-1 text-sm">
+        <div className="mb-4 grid grid-cols-3 gap-2 rounded-xl bg-brand-surf p-1 text-sm">
           <button
             type="button"
             onClick={() => setTab("signup")}
@@ -127,6 +153,13 @@ export default function AuthPage(): React.ReactElement {
             className={`rounded-lg px-3 py-2 ${tab === "signin" ? "bg-brand-card font-medium" : "text-brand-sub"}`}
           >
             Sign In
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("reset")}
+            className={`rounded-lg px-3 py-2 ${tab === "reset" ? "bg-brand-card font-medium" : "text-brand-sub"}`}
+          >
+            Reset
           </button>
         </div>
 
@@ -150,6 +183,16 @@ export default function AuthPage(): React.ReactElement {
           <div className="text-center text-xs text-brand-muted">or</div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+            <input type="hidden" name="honeypot" value={honeypot} readOnly />
+            <input
+              type="text"
+              name="company"
+              value={honeypot}
+              onChange={(event) => setHoneypot(event.target.value)}
+              autoComplete="off"
+              tabIndex={-1}
+              className="hidden"
+            />
             <div>
               <input
                 type="email"
@@ -161,23 +204,29 @@ export default function AuthPage(): React.ReactElement {
                 <p className="mt-1 text-xs text-brand-error">{errors.email.message}</p>
               ) : null}
             </div>
-            <div>
-              <input
-                type="password"
-                placeholder="Password"
-                className="w-full rounded-xl border border-brand-border bg-brand-card2 px-3 py-2 text-sm outline-none"
-                {...register("password")}
-              />
-              {errors.password ? (
-                <p className="mt-1 text-xs text-brand-error">{errors.password.message}</p>
-              ) : null}
-            </div>
+            {tab !== "reset" ? (
+              <div>
+                <input
+                  type="password"
+                  placeholder="Password"
+                  className="w-full rounded-xl border border-brand-border bg-brand-card2 px-3 py-2 text-sm outline-none"
+                  {...register("password")}
+                />
+                {errors.password ? (
+                  <p className="mt-1 text-xs text-brand-error">{errors.password.message}</p>
+                ) : null}
+              </div>
+            ) : null}
 
-            <label className="flex items-center gap-2 text-xs text-brand-sub">
-              <input type="checkbox" className="accent-brand-or" required />
-              I agree to Terms and Privacy Policy
-            </label>
-            <p className="text-xs text-brand-gr">100 free credits on signup</p>
+            {tab !== "reset" ? (
+              <>
+                <label className="flex items-center gap-2 text-xs text-brand-sub">
+                  <input type="checkbox" className="accent-brand-or" required />
+                  I agree to Terms and Privacy Policy
+                </label>
+                <p className="text-xs text-brand-gr">100 free credits on signup</p>
+              </>
+            ) : null}
 
             {authError ? (
               <p className="text-sm text-brand-error">{authError}</p>
@@ -188,6 +237,12 @@ export default function AuthPage(): React.ReactElement {
 
             <button
               type="submit"
+              onClick={(event) => {
+                if (honeypot.trim()) {
+                  event.preventDefault();
+                  setAuthError("Suspicious activity detected.");
+                }
+              }}
               disabled={formLoading}
               className="w-full rounded-xl bg-brand-gradient px-4 py-2 font-semibold text-white disabled:opacity-60"
             >
@@ -195,7 +250,9 @@ export default function AuthPage(): React.ReactElement {
                 ? "Please wait..."
                 : tab === "signup"
                   ? "Create account"
-                  : "Sign in"}
+                  : tab === "reset"
+                    ? "Send reset link"
+                    : "Sign in"}
             </button>
           </form>
 

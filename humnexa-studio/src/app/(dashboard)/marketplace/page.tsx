@@ -8,6 +8,8 @@ export const metadata: Metadata = {
   title: "Template Marketplace",
 };
 
+export const revalidate = 3600;
+
 type TemplateSeed = {
   slug: string;
   title: string;

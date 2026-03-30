@@ -13,6 +13,7 @@ type SettingsData = {
   theme: ThemeMode;
   hindi_mode: boolean;
   workspace_knowledge?: string;
+  low_bandwidth_mode?: boolean;
   editor_font_size: number;
   editor_tab_size: number;
   editor_font_family: string;
@@ -33,6 +34,7 @@ type PatchPayload = Partial<{
   theme: ThemeMode;
   hindi_mode: boolean;
   workspace_knowledge: string;
+  low_bandwidth_mode: boolean;
   editor_font_size: number;
   editor_tab_size: number;
   editor_font_family: string;
@@ -82,6 +84,9 @@ export default function SettingsClient({
     initialSettings.notifications_team,
   );
   const [hindiMode, setHindiMode] = useState(initialSettings.hindi_mode);
+  const [lowBandwidthMode, setLowBandwidthMode] = useState(
+    initialSettings.low_bandwidth_mode ?? false,
+  );
   const [workspaceKnowledge, setWorkspaceKnowledge] = useState(
     initialSettings.workspace_knowledge ?? "",
   );
@@ -160,6 +165,10 @@ export default function SettingsClient({
   useEffect(() => {
     persistSettings({ workspace_knowledge: workspaceKnowledge });
   }, [workspaceKnowledge, persistSettings]);
+
+  useEffect(() => {
+    persistSettings({ low_bandwidth_mode: lowBandwidthMode });
+  }, [lowBandwidthMode, persistSettings]);
 
   useEffect(() => {
     persistSettings({
@@ -362,6 +371,19 @@ export default function SettingsClient({
               className="accent-brand-or"
             />
             Hindi Mode
+          </label>
+        </div>
+
+        <div className="rounded-2xl border border-brand-border bg-brand-card p-5">
+          <h2 className="mb-2 font-medium">Performance</h2>
+          <label className="flex items-center gap-2 text-sm text-brand-sub">
+            <input
+              type="checkbox"
+              checked={lowBandwidthMode}
+              onChange={(event) => setLowBandwidthMode(event.target.checked)}
+              className="accent-brand-or"
+            />
+            Low-bandwidth mode (reduced realtime updates and simplified preview)
           </label>
         </div>
       </div>
