@@ -52,6 +52,18 @@ function ok(body: Record<string, unknown>): NextResponse {
   return NextResponse.json(body, { status: 200 });
 }
 
+function badRequest(body: Record<string, unknown>): NextResponse {
+  return NextResponse.json(body, { status: 400 });
+}
+
+function unauthorized(body: Record<string, unknown>): NextResponse {
+  return NextResponse.json(body, { status: 401 });
+}
+
+function internalError(body: Record<string, unknown>): NextResponse {
+  return NextResponse.json(body, { status: 500 });
+}
+
 function secureCompareSignature(rawBody: Buffer, signature: string, secret: string): boolean {
   const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
   const expectedBuffer = Buffer.from(expected);
@@ -218,19 +230,24 @@ export async function POST(request: Request): Promise<NextResponse> {
     const signature = request.headers.get("x-razorpay-signature");
     const secret = process.env.RAZORPAY_KEY_SECRET;
     if (!signature || !secret) {
-      return ok({ success: true, ignored: true, reason: "missing_signature_or_secret" });
+      return internalError({ error: "Webhook secret or signature is missing" });
     }
 
     const rawBody = Buffer.from(await request.arrayBuffer());
     if (!secureCompareSignature(rawBody, signature, secret)) {
-      return ok({ success: true, ignored: true, reason: "invalid_signature" });
+      return unauthorized({ error: "Invalid webhook signature" });
     }
 
-    const event = JSON.parse(rawBody.toString("utf-8")) as RazorpayWebhookEvent;
+    let event: RazorpayWebhookEvent;
+    try {
+      event = JSON.parse(rawBody.toString("utf-8")) as RazorpayWebhookEvent;
+    } catch {
+      return badRequest({ error: "Invalid JSON payload" });
+    }
     const eventId = String(event.id ?? "");
     const eventType = String(event.event ?? "");
     if (!eventId || !eventType) {
-      return ok({ success: true, ignored: true, reason: "invalid_payload" });
+      return badRequest({ error: "Invalid webhook payload" });
     }
 
     const supabase = createSupabaseAdmin();
@@ -298,6 +315,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       case "subscription.updated":
       case "subscription.pending":
       case "subscription.halted":
+      case "subscription.paused":
+      case "subscription.resumed":
       case "subscription.cancelled":
         await handleSubscriptionEvent(db, eventType, subscription);
         break;
@@ -365,6 +384,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     return ok({ success: true });
   } catch (error) {
     Sentry.captureException(error);
-    return ok({ success: true, logged: true });
+    return internalError({
+      error: "Webhook processing failed",
+      logged: true,
+    });
   }
 }

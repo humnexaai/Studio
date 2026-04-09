@@ -14,11 +14,20 @@ type CheckResult = {
   details: string;
 };
 
-async function checkServiceStatus(url: string): Promise<ServiceStatus> {
+async function checkGroqStatus(): Promise<ServiceStatus> {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return "degraded";
   try {
-    const response = await fetch(url, { method: "GET", cache: "no-store" });
-    if (!response.ok) return "down";
-    return "operational";
+    const response = await fetch("https://api.groq.com/openai/v1/models", {
+      method: "GET",
+      cache: "no-store",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+      },
+    });
+    if (response.ok) return "operational";
+    if (response.status >= 500) return "down";
+    return "degraded";
   } catch {
     return "down";
   }
@@ -51,18 +60,16 @@ export default async function StatusPage(): Promise<React.ReactElement> {
 
   try {
     const hasGroqKey = Boolean(process.env.GROQ_API_KEY);
-    const groqReachable =
-      hasGroqKey &&
-      (await checkServiceStatus(
-        "https://api.groq.com/openai/v1/models",
-      )) === "operational";
+    const groqStatus = await checkGroqStatus();
     checks.push({
       name: "Groq AI",
-      status: hasGroqKey ? (groqReachable ? "operational" : "degraded") : "degraded",
+      status: hasGroqKey ? groqStatus : "degraded",
       details: hasGroqKey
-        ? groqReachable
-          ? "API reachable"
-          : "API key configured but endpoint check degraded"
+        ? groqStatus === "operational"
+          ? "API authenticated and reachable"
+          : groqStatus === "degraded"
+            ? "API key configured but model endpoint is degraded"
+            : "API currently unavailable"
         : "Missing GROQ_API_KEY",
     });
   } catch (error) {

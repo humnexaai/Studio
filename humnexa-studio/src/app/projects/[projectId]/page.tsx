@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServer } from "@/lib/supabase/server";
@@ -56,17 +57,30 @@ export default async function PublicProjectPage({
     .map((row) => `// ${row.file_path}\n${row.content.slice(0, 200)}`)
     .join("\n\n");
 
+  function getAppOrigin(): string {
+    const configured = process.env.NEXT_PUBLIC_APP_URL?.trim();
+    if (configured) {
+      return configured.replace(/\/$/, "");
+    }
+    const requestHeaders = headers();
+    const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host");
+    const proto = requestHeaders.get("x-forwarded-proto") ?? "https";
+    if (!host) {
+      throw new Error("Unable to determine application host");
+    }
+    return `${proto}://${host}`;
+  }
+
   async function remixProject(): Promise<void> {
     "use server";
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/api/projects/${params.projectId}/clone`,
-      {
-        method: "POST",
-        headers: {
-          cookie: "",
-        },
+    const requestHeaders = headers();
+    const response = await fetch(`${getAppOrigin()}/api/projects/${params.projectId}/clone`, {
+      method: "POST",
+      headers: {
+        cookie: requestHeaders.get("cookie") ?? "",
       },
-    );
+      cache: "no-store",
+    });
     const payload = (await response.json()) as { data?: { id?: string } };
     if (!response.ok || !payload.data?.id) {
       redirect("/dashboard");

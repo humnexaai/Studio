@@ -20,7 +20,10 @@ export async function captureServerEvent(
       }),
       cache: "no-store",
     });
-  } catch {
-    // Swallow analytics failures in server paths.
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console
+      console.warn("PostHog capture failed:", error);
+    }
   }
 }
