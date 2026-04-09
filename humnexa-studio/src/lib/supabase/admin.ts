@@ -1,19 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
-import { getSupabaseUrlForServer } from "@/lib/supabase/url";
+import { getRequiredAdminSupabaseEnv } from "@/lib/env/supabase";
 
 let adminClient: ReturnType<typeof createClient<Database>> | null = null;
 
 export function createSupabaseAdmin() {
   if (adminClient) return adminClient;
 
-  const url = getSupabaseUrlForServer();
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !serviceRoleKey) {
-    throw new Error(
-      "NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is missing",
-    );
-  }
+  const { url, serviceRoleKey } = getRequiredAdminSupabaseEnv();
 
   adminClient = createClient<Database>(url, serviceRoleKey, {
     auth: {

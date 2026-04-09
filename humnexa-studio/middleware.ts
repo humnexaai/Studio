@@ -4,6 +4,7 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import type { Database } from "@/types/database";
 import { checkRateLimitByIp, getClientIpFromHeaders } from "@/lib/rate-limit";
 import { getSupabaseUrlWithPooling } from "@/lib/supabase/url";
+import { getRequiredPublicSupabaseEnv } from "@/lib/env/supabase";
 
 const protectedPrefixes = [
   "/dashboard",
@@ -25,10 +26,11 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   const pathname = request.nextUrl.pathname;
   const nonce = randomUUID().replace(/-/g, "");
   const ip = getClientIpFromHeaders(request.headers);
+  const { anonKey } = getRequiredPublicSupabaseEnv();
 
   const supabase = createServerClient<Database>(
     getSupabaseUrlWithPooling(),
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    anonKey,
     {
       cookies: {
         get(name: string) {

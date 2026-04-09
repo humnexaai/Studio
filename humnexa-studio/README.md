@@ -42,11 +42,16 @@ Built by **PLATINUMGOLD Partnership Firm**.
    npm install
    ```
 5. Run Supabase SQL from `supabase/schema.sql`.
-6. Start the dev server:
+6. Validate environment + Supabase connectivity:
+   ```bash
+   npm run env:check
+   npm run supabase:check
+   ```
+7. Start the dev server:
    ```bash
    npm run dev
    ```
-7. Open `http://localhost:3000`.
+8. Open `http://localhost:3000`.
 
 ## Environment Variables
 
@@ -87,6 +92,9 @@ From `.env.example`, configure:
 3. Add all environment variables from `.env.example` in Vercel project settings.
 4. Trigger deployment.
 5. Verify Supabase, payment, and Sentry integrations in production.
+
+For security-first Supabase setup details, see:
+- `docs/supabase-secure-setup.md`
 
 ## License
 
