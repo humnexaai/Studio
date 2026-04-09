@@ -6,8 +6,8 @@ Sentry.init({
   environment: process.env.NODE_ENV,
   integrations: [
     Sentry.replayIntegration({
-      maskAllText: false,
-      blockAllMedia: false,
+      maskAllText: true,
+      blockAllMedia: true,
     }),
   ],
   replaysSessionSampleRate: 0.1,

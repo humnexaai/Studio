@@ -17,6 +17,7 @@ type PreviewPanelProps = {
 
 const PREVIEW_CHANNEL = "HUMNEXA_PREVIEW";
 const VISUAL_RUNTIME_FLAG = "__HUMNEXA_VISUAL_RUNTIME__";
+const SANDBOX_PREVIEW_ORIGIN = "https://sandpack.codesandbox.io";
 
 function supportsLivePreview(framework: string): boolean {
   const normalized = framework.toLowerCase();
@@ -86,7 +87,7 @@ export function PreviewPanel({
         type: "VISUAL_EDIT_TOGGLE",
         enabled,
       },
-      "*",
+      SANDBOX_PREVIEW_ORIGIN,
     );
   };
 
@@ -97,6 +98,7 @@ export function PreviewPanel({
     const frameDocument = iframeRef.current?.contentDocument;
     if (!frameWindow || !frameDocument) return;
     if (frameWindow[VISUAL_RUNTIME_FLAG]) return;
+    const parentOrigin = window.location.origin;
     const script = frameDocument.createElement("script");
     script.type = "text/javascript";
     script.textContent = `
@@ -104,6 +106,7 @@ export function PreviewPanel({
         if (window.${VISUAL_RUNTIME_FLAG}) return;
         window.${VISUAL_RUNTIME_FLAG} = true;
         var enabled = false;
+        var parentOrigin = ${JSON.stringify(parentOrigin)};
         var channel = "${PREVIEW_CHANNEL}";
         var currentEl = null;
         var prevOutline = "";
@@ -163,7 +166,7 @@ export function PreviewPanel({
                 top: rect.top, left: rect.left, right: rect.right, bottom: rect.bottom
               }
             }
-          }, "*");
+          }, parentOrigin);
         }, true);
 
         window.addEventListener("message", function (event) {
@@ -324,7 +327,7 @@ export function PreviewPanel({
               <div className="h-full w-full rounded-[2rem] border border-brand-border bg-[#0d1324] px-3 py-5 text-center">
                 <div className="mx-auto mb-4 h-1 w-12 rounded-full bg-brand-border" />
                 <p className="font-display text-lg font-bold text-brand-or">React Native App</p>
-                <p className="mt-2 text-xs text-brand-sub">Expo preview placeholder</p>
+                <p className="mt-2 text-xs text-brand-sub">Use Expo Go for live device preview</p>
               </div>
             </div>
             <button
@@ -365,7 +368,7 @@ export function PreviewPanel({
               : `● Preview ready · Edit ${visualEditEnabled ? "on" : "off"}`
             : "● Building preview..."
           : reactNativePreview
-            ? "● React Native preview mock"
+            ? "● React Native local preview guidance"
             : flutterPreview
               ? "● Flutter local-run instructions"
               : `● ${framework} editor mode`}

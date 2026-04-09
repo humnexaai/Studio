@@ -16,7 +16,12 @@ async function safeSend(options: {
   subject: string;
   react: ReactElement;
 }): Promise<void> {
-  if (!resend) return;
+  if (!resend) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("RESEND_API_KEY is not configured");
+    }
+    return;
+  }
   await resend.emails.send({
     from: resendFrom,
     to: options.to,

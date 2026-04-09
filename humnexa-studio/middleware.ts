@@ -4,6 +4,7 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import type { Database } from "@/types/database";
 import { checkRateLimitByIp, getClientIpFromHeaders } from "@/lib/rate-limit";
 import { getSupabaseUrlWithPooling } from "@/lib/supabase/url";
+import { getRequiredPublicSupabaseEnv } from "@/lib/env/supabase";
 
 const protectedPrefixes = [
   "/dashboard",
@@ -25,10 +26,11 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   const pathname = request.nextUrl.pathname;
   const nonce = randomUUID().replace(/-/g, "");
   const ip = getClientIpFromHeaders(request.headers);
+  const { anonKey } = getRequiredPublicSupabaseEnv();
 
   const supabase = createServerClient<Database>(
     getSupabaseUrlWithPooling(),
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    anonKey,
     {
       cookies: {
         get(name: string) {
@@ -99,8 +101,8 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     `style-src 'self' 'nonce-${nonce}' 'unsafe-inline'`,
     "img-src 'self' data: blob: https:",
     "font-src 'self' data:",
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.groq.com https://api.anthropic.com https://api.openai.com https://checkout.razorpay.com",
-    "frame-src https://checkout.razorpay.com",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.groq.com https://api.anthropic.com https://api.openai.com https://checkout.razorpay.com https://*.ingest.sentry.io https://app.posthog.com https://us.i.posthog.com https://eu.i.posthog.com https://*.posthog.com https://sandpack.codesandbox.io https://*.codesandbox.io",
+    "frame-src https://checkout.razorpay.com https://sandpack.codesandbox.io https://*.codesandbox.io",
     "object-src 'none'",
     "base-uri 'self'",
     "frame-ancestors 'none'",
