@@ -32,6 +32,26 @@ function isFlutterFramework(framework: string): boolean {
   return framework.toLowerCase() === "flutter";
 }
 
+function previewHintForFramework(framework: string): string {
+  const normalized = framework.toLowerCase();
+  if (normalized === "python") {
+    return "Run locally: python -m venv .venv && source .venv/bin/activate && python main.py";
+  }
+  if (normalized === "java") {
+    return "Run locally: javac Main.java && java Main";
+  }
+  if (normalized === "go") {
+    return "Run locally: go mod tidy && go run .";
+  }
+  if (normalized === "rust") {
+    return "Run locally: cargo run";
+  }
+  if (normalized === "php") {
+    return "Run locally: php -S localhost:8000";
+  }
+  return "Run the generated project locally using its framework CLI/runtime command.";
+}
+
 function mapFrameworkToTemplate(framework: string): SandpackTemplate {
   const normalized = framework.toLowerCase();
   if (normalized === "react") return "create-react-app";
@@ -355,8 +375,12 @@ export function PreviewPanel({
           </div>
         ) : (
           <div className="flex h-full w-full items-center justify-center rounded-xl border border-brand-border bg-brand-card2 p-6 text-center text-sm text-brand-sub">
-            Live preview not available for this framework. Server-side preview coming in
-            Phase 4.
+            <div className="max-w-xl space-y-2">
+              <p>Live browser preview is not available for this framework.</p>
+              <p className="rounded-lg border border-brand-border bg-brand-bg px-3 py-2 font-mono text-xs text-brand-text">
+                {previewHintForFramework(framework)}
+              </p>
+            </div>
           </div>
         )}
       </div>

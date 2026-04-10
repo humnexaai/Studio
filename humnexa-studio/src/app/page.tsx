@@ -66,7 +66,12 @@ export default function Home(): React.ReactElement {
   async function handleBuild(formData: FormData): Promise<void> {
     "use server";
     const idea = String(formData.get("idea") ?? "").trim();
-    const framework = String(formData.get("framework") ?? "nextjs").trim();
+    const selectedFramework = String(formData.get("framework") ?? "nextjs").trim();
+    const customFramework = String(formData.get("customFramework") ?? "").trim();
+    const framework =
+      selectedFramework === "other"
+        ? (customFramework || "custom").slice(0, 40)
+        : selectedFramework.slice(0, 40);
     const supabase = createSupabaseServer();
     const {
       data: { user },
@@ -143,7 +148,16 @@ export default function Home(): React.ReactElement {
                 <option value="nextjs">Next.js</option>
                 <option value="react">React</option>
                 <option value="vue">Vue</option>
+                <option value="python">Python</option>
+                <option value="flutter">Flutter</option>
+                <option value="react-native">React Native (Expo)</option>
+                <option value="other">Other (Custom)</option>
               </select>
+              <input
+                name="customFramework"
+                placeholder="Custom language/framework (optional)"
+                className="min-w-[220px] rounded-xl border border-brand-border bg-brand-card2 px-3 py-2 text-sm text-brand-sub outline-none"
+              />
               <button
                 type="button"
                 className="rounded-xl border border-brand-border bg-brand-card2 p-2 text-brand-sub transition hover:text-brand-text"

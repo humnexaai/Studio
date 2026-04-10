@@ -9,6 +9,43 @@ type PromptOptions = {
 function frameworkSpecificInstructions(framework: string): string[] {
   const normalized = framework.toLowerCase();
 
+  if (normalized === "nextjs") {
+    return [
+      "Next.js generation rules:",
+      "- Generate App Router compatible Next.js 14+ code.",
+      "- Prefer server components for data-fetching pages unless client state is required.",
+      "- Keep API logic in route handlers under src/app/api.",
+      "- Use TypeScript and production-ready folder structure.",
+    ];
+  }
+
+  if (normalized === "react") {
+    return [
+      "React generation rules:",
+      "- Generate React application code with reusable components.",
+      "- Keep state logic clean and minimize unnecessary re-renders.",
+      "- Use TypeScript for components, hooks, and utilities.",
+    ];
+  }
+
+  if (normalized === "vue") {
+    return [
+      "Vue generation rules:",
+      "- Generate Vue 3 compatible code with SFC conventions.",
+      "- Keep components modular and props/events clearly typed where possible.",
+      "- Follow composition-api friendly patterns.",
+    ];
+  }
+
+  if (normalized === "python") {
+    return [
+      "Python generation rules:",
+      "- Generate idiomatic Python project structure and modules.",
+      "- Include dependency and entry-point guidance (requirements.txt and run command) when relevant.",
+      "- Keep code production-oriented with clear separation of concerns.",
+    ];
+  }
+
   if (normalized === "react-native") {
     return [
       "React Native / Expo generation rules:",
@@ -33,9 +70,10 @@ function frameworkSpecificInstructions(framework: string): string[] {
   }
 
   return [
-    "Web generation rules:",
-    "- Generate production-ready web app code for the selected framework.",
-    "- Keep components modular and follow framework conventions.",
+    "General generation rules:",
+    "- Generate production-ready code for the selected framework or language.",
+    "- Keep components/modules modular and follow ecosystem conventions.",
+    "- Include complete files only and ensure runnable structure.",
   ];
 }
 
