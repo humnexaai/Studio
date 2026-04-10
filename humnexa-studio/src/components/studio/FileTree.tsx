@@ -297,6 +297,44 @@ function fileLabel(text: string, className: string): React.ReactElement {
 
 function fileIconForPath(path: string): React.ReactNode {
   const lower = path.toLowerCase();
+  if (lower.endsWith(".java")) {
+    return fileLabel("JAVA", "bg-amber-500/20 text-amber-300");
+  }
+  if (lower.endsWith(".php")) {
+    return fileLabel("PHP", "bg-indigo-500/20 text-indigo-300");
+  }
+  if (lower.endsWith(".rb")) {
+    return fileLabel("RB", "bg-rose-500/20 text-rose-300");
+  }
+  if (lower.endsWith(".swift")) {
+    return fileLabel("SW", "bg-orange-500/20 text-orange-200");
+  }
+  if (
+    lower.endsWith(".cpp") ||
+    lower.endsWith(".cc") ||
+    lower.endsWith(".cxx") ||
+    lower.endsWith(".c")
+  ) {
+    return fileLabel("C++", "bg-slate-500/20 text-slate-200");
+  }
+  if (lower.endsWith(".sh")) {
+    return fileLabel("SH", "bg-zinc-500/20 text-zinc-200");
+  }
+  if (lower.endsWith(".yaml") || lower.endsWith(".yml")) {
+    return fileLabel("YAML", "bg-teal-500/20 text-teal-300");
+  }
+  if (lower.endsWith(".toml")) {
+    return fileLabel("TOML", "bg-stone-500/20 text-stone-200");
+  }
+  if (lower.endsWith(".xml")) {
+    return fileLabel("XML", "bg-lime-500/20 text-lime-300");
+  }
+  if (lower.endsWith(".html")) {
+    return fileLabel("HTML", "bg-orange-500/20 text-orange-300");
+  }
+  if (lower.endsWith(".css") || lower.endsWith(".scss")) {
+    return fileLabel("CSS", "bg-blue-500/20 text-blue-200");
+  }
   if (lower.endsWith(".py")) {
     return fileLabel("PY", "bg-blue-500/20 text-blue-300");
   }

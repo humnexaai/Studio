@@ -35,7 +35,8 @@ type FrameworkOption =
   | "vue"
   | "python"
   | "flutter"
-  | "react-native";
+  | "react-native"
+  | "other";
 
 const frameworkDisplayNames: Record<FrameworkOption, string> = {
   nextjs: "Next.js",
@@ -44,6 +45,7 @@ const frameworkDisplayNames: Record<FrameworkOption, string> = {
   python: "Python",
   flutter: "Flutter",
   "react-native": "React Native (Expo)",
+  other: "Other (Custom)",
 };
 
 export default function DashboardClient({
@@ -57,6 +59,7 @@ export default function DashboardClient({
   const [creating, setCreating] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [framework, setFramework] = useState<FrameworkOption>("nextjs");
+  const [customFramework, setCustomFramework] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const activityItems = useMemo(
@@ -75,6 +78,12 @@ export default function DashboardClient({
       setError("Project name is required.");
       return;
     }
+    const resolvedFramework =
+      framework === "other" ? customFramework.trim() : framework;
+    if (!resolvedFramework) {
+      setError("Custom framework/language is required.");
+      return;
+    }
     setError(null);
     setCreating(true);
 
@@ -85,7 +94,7 @@ export default function DashboardClient({
       },
       body: JSON.stringify({
         name: projectName.trim(),
-        framework,
+        framework: resolvedFramework,
       }),
     });
 
@@ -216,6 +225,14 @@ export default function DashboardClient({
                   ),
                 )}
               </select>
+              {framework === "other" ? (
+                <input
+                  value={customFramework}
+                  onChange={(event) => setCustomFramework(event.target.value)}
+                  placeholder="Enter language/framework (e.g. Java, Rust, PHP)"
+                  className="w-full rounded-xl border border-brand-border bg-brand-card2 px-3 py-2 text-sm outline-none"
+                />
+              ) : null}
               {error ? <p className="text-sm text-brand-error">{error}</p> : null}
             </div>
             <div className="mt-5 flex justify-end gap-2">
