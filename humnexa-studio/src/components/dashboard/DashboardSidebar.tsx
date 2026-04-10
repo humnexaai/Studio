@@ -12,6 +12,7 @@ const navItems = [
   { href: "/billing", label: "Credits" },
   { href: "/dashboard/team", label: "Team" },
   { href: "/settings", label: "Settings" },
+  { href: "/about", label: "About" },
   { href: "/terms", label: "Terms" },
   { href: "/privacy", label: "Privacy" },
   { href: "/refund", label: "Refund" },

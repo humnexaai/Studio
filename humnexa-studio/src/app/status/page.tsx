@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
+import { PublicPageShell } from "@/components/public/PublicPageShell";
 
 export const metadata: Metadata = {
   title: "System Status",
@@ -83,7 +84,7 @@ export default async function StatusPage(): Promise<React.ReactElement> {
   const overall = aggregateStatus(checks);
 
   return (
-    <main className="mx-auto max-w-3xl space-y-5 px-4 py-10">
+    <PublicPageShell contentClassName="mx-auto w-full max-w-3xl space-y-5 px-4 py-10">
       <header className="rounded-2xl border border-brand-border bg-brand-card p-5">
         <h1 className="text-2xl font-semibold">Humnexa Status</h1>
         <p className="mt-1 text-sm text-brand-sub">
@@ -126,6 +127,6 @@ export default async function StatusPage(): Promise<React.ReactElement> {
           </article>
         ))}
       </section>
-    </main>
+    </PublicPageShell>
   );
 }

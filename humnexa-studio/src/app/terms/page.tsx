@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PublicPageShell } from "@/components/public/PublicPageShell";
 
 export const metadata: Metadata = {
   title: "Terms of Service",
@@ -7,7 +8,7 @@ export const metadata: Metadata = {
 
 export default function TermsPage(): React.ReactElement {
   return (
-    <main className="mx-auto max-w-4xl space-y-6 px-4 py-10 text-brand-text">
+    <PublicPageShell contentClassName="mx-auto w-full max-w-4xl space-y-6 px-4 py-10 text-brand-text">
       <h1 className="text-3xl font-bold">Terms of Service</h1>
       <p className="text-sm text-brand-sub">
         Effective Date: 2026-03-29 | Version: 1.0
@@ -124,6 +125,6 @@ export default function TermsPage(): React.ReactElement {
           Postal: Mumbai, Maharashtra, India
         </p>
       </section>
-    </main>
+    </PublicPageShell>
   );
 }

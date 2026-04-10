@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { PublicPageShell } from "@/components/public/PublicPageShell";
 
 export const metadata: Metadata = {
   title: "Humnexa Studio vs Lovable",
@@ -9,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function VsLovablePage(): React.ReactElement {
   return (
-    <main className="mx-auto min-h-screen w-full max-w-5xl px-4 py-10">
+    <PublicPageShell contentClassName="mx-auto w-full max-w-5xl px-4 py-10">
       <h1 className="text-3xl font-black">Humnexa Studio vs Lovable</h1>
       <p className="mt-2 text-sm text-brand-sub">
         Built for India-first shipping: predictable INR pricing, UPI subscriptions, and
@@ -44,6 +45,6 @@ export default function VsLovablePage(): React.ReactElement {
           Try Humnexa Studio
         </Link>
       </div>
-    </main>
+    </PublicPageShell>
   );
 }

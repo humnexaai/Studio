@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { PublicPageShell } from "@/components/public/PublicPageShell";
 import { createSupabaseServer } from "@/lib/supabase/server";
 
 type Props = {
@@ -89,7 +90,7 @@ export default async function PublicProjectPage({
   }
 
   return (
-    <main className="mx-auto max-w-5xl space-y-6 px-4 py-8">
+    <PublicPageShell contentClassName="mx-auto w-full max-w-5xl space-y-6 px-4 py-8">
       <header className="rounded-2xl border border-brand-border bg-brand-card p-5">
         <p className="text-xs uppercase tracking-wide text-brand-sub">Public Project</p>
         <h1 className="mt-2 text-2xl font-semibold">{typedProject.name}</h1>
@@ -127,6 +128,6 @@ export default async function PublicProjectPage({
           </button>
         </form>
       </div>
-    </main>
+    </PublicPageShell>
   );
 }

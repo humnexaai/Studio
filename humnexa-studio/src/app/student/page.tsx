@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { PublicPageShell } from "@/components/public/PublicPageShell";
 
 export const metadata: Metadata = {
   title: "Student Plan",
@@ -9,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function StudentPage(): React.ReactElement {
   return (
-    <main className="mx-auto min-h-screen w-full max-w-4xl px-4 py-10">
+    <PublicPageShell contentClassName="mx-auto w-full max-w-4xl px-4 py-10">
       <article className="rounded-2xl border border-brand-border bg-brand-card p-6 md:p-8">
         <h1 className="text-3xl font-black">Student Plan — ₹99/month</h1>
         <p className="mt-3 text-sm text-brand-sub">
@@ -46,6 +47,6 @@ export default function StudentPage(): React.ReactElement {
           </Link>
         </div>
       </article>
-    </main>
+    </PublicPageShell>
   );
 }

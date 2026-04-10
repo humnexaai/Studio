@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PublicPageShell } from "@/components/public/PublicPageShell";
 
 export const metadata: Metadata = {
   title: "India Stack - Humnexa Studio",
@@ -181,7 +182,7 @@ const placeOrder = async (mode: PaymentMode, phone: string, otp?: string): Promi
 
 export default function IndiaStackPage(): React.ReactElement {
   return (
-    <main className="min-h-screen bg-[#060810] px-6 py-12 text-brand-text">
+    <PublicPageShell contentClassName="px-6 py-12">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-10">
         <section className="rounded-3xl border border-brand-border bg-brand-card p-8 text-center">
           <p className="mb-3 inline-flex rounded-full border border-brand-or/40 bg-brand-or/10 px-3 py-1 text-xs text-brand-or">
@@ -220,6 +221,6 @@ export default function IndiaStackPage(): React.ReactElement {
           </a>
         </div>
       </div>
-    </main>
+    </PublicPageShell>
   );
 }

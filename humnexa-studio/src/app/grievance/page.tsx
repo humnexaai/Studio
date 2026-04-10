@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PublicPageShell } from "@/components/public/PublicPageShell";
 
 export const metadata: Metadata = {
   title: "Grievance Officer",
@@ -8,8 +9,8 @@ export const metadata: Metadata = {
 
 export default function GrievancePage(): React.ReactElement {
   return (
-    <main className="min-h-screen bg-brand-bg px-6 py-10 text-brand-text">
-      <article className="mx-auto max-w-3xl rounded-2xl border border-brand-border bg-brand-card p-6">
+    <PublicPageShell contentClassName="mx-auto w-full max-w-3xl px-6 py-10">
+      <article className="rounded-2xl border border-brand-border bg-brand-card p-6">
         <h1 className="font-display text-3xl font-extrabold">Grievance Officer</h1>
         <p className="mt-2 text-sm text-brand-sub">
           In line with Indian legal requirements, grievances are acknowledged
@@ -30,6 +31,6 @@ export default function GrievancePage(): React.ReactElement {
           </p>
         </div>
       </article>
-    </main>
+    </PublicPageShell>
   );
 }

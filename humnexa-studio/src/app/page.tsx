@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { ArrowRight, Mic, Paperclip, Sparkles } from "lucide-react";
 import { createSupabaseServer } from "@/lib/supabase/server";
+import { PublicPageShell } from "@/components/public/PublicPageShell";
 import packageJson from "../../package.json";
 
 export const revalidate = 3600;
@@ -90,7 +91,7 @@ export default function Home(): React.ReactElement {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-brand-bg px-6 py-10">
+    <PublicPageShell contentClassName="relative overflow-hidden px-6 py-10">
       <script
         type="application/ld+json"
         // eslint-disable-next-line react/no-danger
@@ -199,22 +200,8 @@ export default function Home(): React.ReactElement {
           <Metric label="Starting" value="₹420/mo" />
           <Metric label="Uptime" value="99.9%" />
         </footer>
-        <div className="flex flex-wrap items-center justify-center gap-3 pb-3 text-xs text-brand-sub">
-          <a href="/terms" className="underline">
-            Terms
-          </a>
-          <a href="/privacy" className="underline">
-            Privacy
-          </a>
-          <a href="/refund" className="underline">
-            Refund
-          </a>
-          <a href="/grievance" className="underline">
-            Grievance Officer
-          </a>
-        </div>
       </div>
-    </main>
+    </PublicPageShell>
   );
 }
 

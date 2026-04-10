@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { PublicPageShell } from "@/components/public/PublicPageShell";
 
 export const metadata: Metadata = {
   title: "Refund Policy",
@@ -9,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function RefundPolicyPage(): React.ReactElement {
   return (
-    <main className="mx-auto min-h-screen w-full max-w-4xl px-4 py-10">
+    <PublicPageShell contentClassName="mx-auto w-full max-w-4xl px-4 py-10">
       <article className="rounded-2xl border border-brand-border bg-brand-card p-6 md:p-8">
         <h1 className="text-3xl font-black">Refund Policy</h1>
         <p className="mt-3 text-sm text-brand-sub">Effective date: 2026-03-29 • Version: 1.0</p>
@@ -72,6 +73,6 @@ export default function RefundPolicyPage(): React.ReactElement {
           </p>
         </section>
       </article>
-    </main>
+    </PublicPageShell>
   );
 }
